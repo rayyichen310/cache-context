@@ -63,17 +63,25 @@ test('the bar draws what is used and the buffer, never what is deferred or free'
   ])
 })
 
-async function setUp($: Parameters<Parameters<typeof test>[1]>[0], on: Parameters<Parameters<typeof test>[1]>[1], lang = 'zh-Hant') {
+async function setUp($: Parameters<Parameters<typeof test>[1]>[0], on: Parameters<Parameters<typeof test>[1]>[1], lang = 'zh-Hant', isHeadless = false) {
   mock.clock(on, { now: 1_700_000_000_000 })
   mock.store(on)
   mock.env(on, { LANG: lang === 'en' ? 'en_US.UTF-8' : 'zh_TW.UTF-8' })
-  const calls = { compacted: 0, toasts: [] as string[] }
+  const calls = { compacted: 0, toasts: [] as string[], commands: [] as string[] }
   on('session.usage', () => ({ value: USAGE }))
   on('session.measure', () => ({ changed: [] }))
   on('session.compact', () => {
     calls.compacted += 1
     return { skip: 'test' }
   })
+  // Stands for the engine's own /compact, run as the person would type it.
+  on('command.run', { command: 'compact' }, (_, e) => {
+    calls.commands.push(e.command)
+    return { text: '' }
+  })
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  on('command.register', (_, e) => ({ value: { command: e.name } }))
+  on('ui.panes', () => ({ value: [] }))
   on('ui.toast', (_, e) => {
     calls.toasts.push(e.text)
     return { value: undefined }
@@ -81,6 +89,8 @@ async function setUp($: Parameters<Parameters<typeof test>[1]>[0], on: Parameter
   on('ui.open', () => ({ value: { isPlaced: true } }))
   // Stands for the engine's own, empty band beneath the plugin.
   on('ui.render', { component: 'AbovePrompt' }, (inner, e) => inner.ui.resolve(e).Box({}))
+  // The desktop app's local sessions run headless: no person at a prompt of the engine's own.
+  if (isHeadless) await $.session.start({ cwd: '/tmp', surface: null, isInteractive: false })
   await $.command.run({ command: 'cache-lang', args: lang }).catch(() => undefined)
   await $.session.measure({ context: { window: 1_000_000 }, rateLimits: [] })
 
@@ -155,4 +165,14 @@ test('in English the panel keeps its rows inside the column, in ordinary bracket
   const label = (await pane.findAll({ type: 'Svg' })).find(one => one.props.alt === '134.4k to auto-compact')
   expect(Number(label!.props.width)).toBeLessThan(200)
   await pane.unmount()
+})
+
+test('where compaction cannot be called, as in the desktop app, compact runs /compact instead', { timeoutMs: 30_000 }, async ($, on) => {
+  const calls = await setUp($, on, 'zh-Hant', true)
+  const ui = await $.ui.mount({ plugin: 'cache-context', surface: 'desktop', component: 'AbovePrompt', props: bandProps(false) })
+  await ui.press({ key: 'compact' })
+  expect(calls.commands).toEqual(['compact'])
+  expect(calls.compacted).toBe(0)
+  expect(calls.toasts).toEqual([])
+  await ui.unmount()
 })

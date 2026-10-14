@@ -70,6 +70,8 @@ let heardLang: Lang | null | undefined
 let pingAt: number | null = null
 // Main-thread requests under way: each touched the cache as it started.
 let inFlight = 0
+// No person at the engine's own prompt, as in the desktop app's local sessions: compaction there runs only as a /compact prompt.
+let isHeadless = false
 // What the panel's last button press came to, shown under its buttons.
 let lastAction = ''
 // The band's words as last drawn: the countdown redraws only when they change.
@@ -250,6 +252,11 @@ async function contextPartOf($: EngineInterface, tag: string, isWorking: boolean
     onCompact: async () => {
       await update($, isCompacting, () => true)
       try {
+        if (isHeadless) {
+          // Run as if the person typed /compact; it is queued and runs once the session is idle.
+          await $.command.run({ command: 'compact' })
+          return
+        }
         const r = await $.session.compact()
         if ('skip' in r) $.ui.toast(w.skipped(r.skip))
         await measureContext($)
@@ -436,6 +443,7 @@ async function ping($: EngineInterface, isForced: boolean): Promise<PingResult> 
 
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
+    isHeadless = !e.isInteractive
     $.clock.every(1000, async () => {
       const lang = await langOf($)
       const m = MESSAGES[lang]
