@@ -63,10 +63,10 @@ test('the bar draws what is used and the buffer, never what is deferred or free'
   ])
 })
 
-async function setUp($: Parameters<Parameters<typeof test>[1]>[0], on: Parameters<Parameters<typeof test>[1]>[1]) {
+async function setUp($: Parameters<Parameters<typeof test>[1]>[0], on: Parameters<Parameters<typeof test>[1]>[1], lang = 'zh-Hant') {
   mock.clock(on, { now: 1_700_000_000_000 })
   mock.store(on)
-  mock.env(on, { LANG: 'zh_TW.UTF-8' })
+  mock.env(on, { LANG: lang === 'en' ? 'en_US.UTF-8' : 'zh_TW.UTF-8' })
   const calls = { compacted: 0, toasts: [] as string[] }
   on('session.usage', () => ({ value: USAGE }))
   on('session.measure', () => ({ changed: [] }))
@@ -81,7 +81,7 @@ async function setUp($: Parameters<Parameters<typeof test>[1]>[0], on: Parameter
   on('ui.open', () => ({ value: { isPlaced: true } }))
   // Stands for the engine's own, empty band beneath the plugin.
   on('ui.render', { component: 'AbovePrompt' }, (inner, e) => inner.ui.resolve(e).Box({}))
-  await $.command.run({ command: 'cache-lang', args: 'zh-Hant' }).catch(() => undefined)
+  await $.command.run({ command: 'cache-lang', args: lang }).catch(() => undefined)
   await $.session.measure({ context: { window: 1_000_000 }, rateLimits: [] })
 
   return calls
@@ -140,4 +140,19 @@ test('the panel leads with the context window, and its legend opens and closes',
     expect(await has('Messages')).toBe(false)
     await pane.unmount()
   }
+})
+
+test('in English the panel keeps its rows inside the column, in ordinary brackets', { timeoutMs: 30_000 }, async ($, on) => {
+  await setUp($, on, 'en')
+  const pane = await $.ui.mount({ plugin: 'cache-context', surface: 'desktop', component: 'Pane', requestId: 'cache', props: paneProps })
+  await pane.press({ key: 'legend' })
+  const alts = (await pane.findAll({ type: 'Svg' })).map(one => String(one.props.alt))
+  // Short enough that the compact button keeps its room beside it.
+  expect(alts).toContain('134.4k to auto-compact')
+  expect(alts).toContain('MCP tools (deferred) 62.6k (on demand)')
+  expect(alts.some(one => one.includes('（'))).toBe(false)
+  // The words are drawn only as wide as they are, leaving the rest of the row to the button.
+  const label = (await pane.findAll({ type: 'Svg' })).find(one => one.props.alt === '134.4k to auto-compact')
+  expect(Number(label!.props.width)).toBeLessThan(200)
+  await pane.unmount()
 })

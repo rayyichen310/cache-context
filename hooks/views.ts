@@ -450,8 +450,10 @@ function contextSection(els: Els, surface: Surface, m: Messages, ctx: ContextPar
       Svg({ alt: `${w.title} ${fill}`, width: PANEL_PIXELS, height: head.height, source: head.source }),
       Svg({ alt: `${w.title} ${fill}`, width: PANEL_PIXELS, height: 6, source: barSvg(meter, PANEL_PIXELS, m.tag) }),
     )
-    const words = labelSvg(toAuto, LABEL_PIXELS, 'body', m)
-    rows.push(between([Svg({ alt: toAuto, width: LABEL_PIXELS, height: words.height, source: words.source }), ...(control === null ? [] : [control])]))
+    // Drawn only as wide as its words (14px type, about 7.3px a cell), so the compact button keeps the rest of the row.
+    const wordsWidth = Math.min(LABEL_PIXELS, Math.ceil(cells(toAuto) * 7.3))
+    const words = labelSvg(toAuto, wordsWidth, 'body', m)
+    rows.push(between([Svg({ alt: toAuto, width: wordsWidth, height: words.height, source: words.source }), ...(control === null ? [] : [control])]))
   } else {
     const width = Math.max(10, Math.min(PANEL_CELLS, columns) - 2)
     rows.push(
@@ -473,7 +475,7 @@ function contextSection(els: Els, surface: Surface, m: Messages, ctx: ContextPar
     // What loads on demand takes no room, so it goes last.
     const ordered = [...meter.segments.filter(s => s.kind !== 'deferred'), ...meter.segments.filter(s => s.kind === 'deferred')]
     const legend: RenderNode[] = ordered.map(s => {
-      const amount = s.kind === 'deferred' ? `${fmtK(s.tokens)}（${w.deferred}）` : `${fmtK(s.tokens)} · ${pct(s.tokens)}`
+      const amount = s.kind === 'deferred' ? `${fmtK(s.tokens)}${w.aside(w.deferred)}` : `${fmtK(s.tokens)} · ${pct(s.tokens)}`
       if (Svg) {
         const row = splitSvg(s.name, amount, 'legend', m, hex.get(s) ?? null)
 

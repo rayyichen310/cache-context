@@ -14,6 +14,8 @@ export type ContextWords = {
   legendHide: string
   deferred: string
   waiting: string
+  /** An aside in the language's own brackets. */
+  aside: (text: string) => string
   skipped: (why: string) => string
   failed: (why: string) => string
 }
@@ -28,6 +30,7 @@ const ZH_HANT: ContextWords = {
   legendHide: '收起說明 ▴',
   deferred: '按需載入，不計入',
   waiting: '等下次回應',
+  aside: text => `（${text}）`,
   skipped: why => `壓縮未執行：${why}`,
   failed: why => `無法壓縮：${why}`,
 }
@@ -42,6 +45,7 @@ const ZH: ContextWords = {
   legendHide: '收起说明 ▴',
   deferred: '按需加载，不计入',
   waiting: '等下次回复',
+  aside: text => `（${text}）`,
   skipped: why => `压缩未执行：${why}`,
   failed: why => `无法压缩：${why}`,
 }
@@ -49,13 +53,14 @@ const ZH: ContextWords = {
 const EN: ContextWords = {
   label: 'Context',
   title: 'Context window',
-  toAuto: left => `${left} tokens until auto-compact`,
+  toAuto: left => `${left} to auto-compact`,
   compact: 'Compact session',
   compacting: 'Compacting…',
   legendShow: 'Legend ▾',
   legendHide: 'Hide legend ▴',
-  deferred: 'loaded on demand, not counted',
+  deferred: 'on demand',
   waiting: 'until the next reply',
+  aside: text => ` (${text})`,
   skipped: why => `Compaction skipped: ${why}`,
   failed: why => `Could not compact: ${why}`,
 }
@@ -86,7 +91,7 @@ export function percentOf(meter: ContextMeter): number | null {
 export function fillText(meter: ContextMeter, w: ContextWords): string {
   const percent = percentOf(meter)
 
-  return percent === null ? `—/${fmtK(meter.max)}（${w.waiting}）` : `${fmtK(meter.tokens!)}/${fmtK(meter.max)} (${percent}%)`
+  return percent === null ? `—/${fmtK(meter.max)}${w.aside(w.waiting)}` : `${fmtK(meter.tokens!)}/${fmtK(meter.max)} (${percent}%)`
 }
 
 export function toAutoText(meter: ContextMeter, w: ContextWords): string | null {
