@@ -1,6 +1,6 @@
 {
   "name": "cache-context",
-  "version": "0.2.2-context.1",
+  "version": "0.2.2-context.2",
   "description": "A fork of olddonkey/cache-refresher 0.2.2: the prompt-cache countdown plus the context window fill, a compact button and a per-category breakdown.",
   "author": {
     "name": "rayyichen310",
