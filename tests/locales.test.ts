@@ -859,11 +859,11 @@ for (const lang of LANGS) {
     for await (const _ of step) void _
     await step.result
     const band = await $.ui.mount({
-      plugin: 'cache-refresher', surface: 'desktop', component: 'AbovePrompt',
+      plugin: 'cache-context', surface: 'desktop', component: 'AbovePrompt',
       props: { hasSurvey: false, isWorking: false, maxRows: 10, bodyColumns: 120, scroll: { offset: 0, bodyRows: 10 }, view: {} },
     })
     const pane = await $.ui.mount({
-      plugin: 'cache-refresher', surface: 'desktop', component: 'Pane', requestId: 'cache',
+      plugin: 'cache-context', surface: 'desktop', component: 'Pane', requestId: 'cache',
       props: { title: MESSAGES[lang].paneTitle, isFocused: true, bodyColumns: 60, placement: 'dock', scroll: { offset: 0, bodyRows: 40 }, view: {} },
     })
     const bandDrawings = await band.findAll({ type: 'Svg' })

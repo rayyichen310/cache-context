@@ -37,8 +37,34 @@ export type Auto = {
   cap: number
 }
 
+/** One /context category, estimated locally. */
+export type Segment = {
+  name: string
+  tokens: number
+  /** Theme colour key, as /context draws the row. */
+  color: string
+  kind: 'used' | 'free' | 'buffer' | 'deferred'
+}
+
+/** The main conversation's context window as the engine last measured it. */
+export type ContextMeter = {
+  /** Input tokens of the last response; absent after compaction until the next one. */
+  tokens?: number
+  /** The window measured against: the compaction window when one is set. */
+  max: number
+  /** Where auto-compaction runs; absent when it is off. */
+  threshold?: number
+  segments: Segment[]
+}
+
 declare module 'claude-code' {
   interface PluginState {
-    'cache-refresher': { snapshot: Snapshot | null; auto: Auto }
+    'cache-context': {
+      snapshot: Snapshot | null
+      auto: Auto
+      context: ContextMeter | null
+      isCompacting: boolean
+      isLegendOpen: boolean
+    }
   }
 }

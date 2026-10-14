@@ -1,14 +1,14 @@
 {
-  "name": "olddonkey",
-  "description": "Claude Code plugins by olddonkey",
+  "name": "ray-mods",
+  "description": "Claude Code mods by rayyichen310",
   "owner": {
-    "name": "olddonkey"
+    "name": "rayyichen310"
   },
   "plugins": [
     {
-      "name": "cache-refresher",
+      "name": "cache-context",
       "source": "./",
-      "description": "Shows when your prompt cache expires and what rebuilding it would cost. Optional auto-refresh, off by default, keeps it active while you are away and uses a little plan usage or API credit."
+      "description": "A fork of olddonkey/cache-refresher 0.2.2: the prompt-cache countdown plus the context window fill, a compact button and a per-category breakdown."
     }
   ]
 }

@@ -1,14 +1,19 @@
 {
-  "name": "cache-refresher",
-  "version": "0.2.2",
-  "description": "Shows when your prompt cache expires and what rebuilding it would cost. Optional auto-refresh, off by default, keeps it active while you are away and uses a little plan usage or API credit.",
+  "name": "cache-context",
+  "version": "0.2.2-context.1",
+  "description": "A fork of olddonkey/cache-refresher 0.2.2: the prompt-cache countdown plus the context window fill, a compact button and a per-category breakdown.",
   "author": {
-    "name": "olddonkey",
-    "url": "https://github.com/olddonkey"
+    "name": "rayyichen310",
+    "url": "https://github.com/rayyichen310"
   },
-  "homepage": "https://github.com/olddonkey/cache-refresher",
-  "repository": "https://github.com/olddonkey/cache-refresher",
+  "homepage": "https://github.com/rayyichen310/cache-context",
+  "repository": "https://github.com/rayyichen310/cache-context",
   "license": "MIT",
-  "keywords": ["prompt-cache", "cost", "mod"],
+  "keywords": [
+    "prompt-cache",
+    "context-window",
+    "cost",
+    "mod"
+  ],
   "types": "./types/index.d.ts"
 }

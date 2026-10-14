@@ -1,7 +1,8 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, ModelUsage, Register } from 'claude-code'
 
-import type { Snapshot, Ttl } from '../types'
+import type { ContextMeter, Snapshot, Ttl } from '../types'
+import { contextWords } from './context'
 import { detect, follow } from './detect'
 import { PING_MARGIN_MS, TTL_MS, WRITE_MULTIPLIER, fmtRemaining, fmtTokens, fmtUsd, priceOf } from './economics'
 import { LANGS, MESSAGES, langFrom } from './messages'
@@ -22,18 +23,22 @@ import {
 import type { Extension, Observation, Verdict, View } from './model'
 import { autoLines, report } from './report'
 import { bandView, paneView } from './views'
-import type { Motion } from './views'
+import type { ContextPart, Motion } from './views'
 
 const DEFAULT_CAP = 12
 const MAX_CAP = 200
 
 const PANE = 'cache'
 
-const snap = atom({ plugin: 'cache-refresher', key: 'snapshot' } as const, null)
-const auto = atom({ plugin: 'cache-refresher', key: 'auto' } as const, {
+const snap = atom({ plugin: 'cache-context', key: 'snapshot' } as const, null)
+const auto = atom({ plugin: 'cache-context', key: 'auto' } as const, {
   isOn: false,
   cap: DEFAULT_CAP,
 })
+
+const context = atom({ plugin: 'cache-context', key: 'context' } as const, null)
+const isCompacting = atom({ plugin: 'cache-context', key: 'isCompacting' } as const, false)
+const isLegendOpen = atom({ plugin: 'cache-context', key: 'isLegendOpen' } as const, false)
 
 const PING_PROMPT =
   'Prompt-cache keep-alive from the cache-refresher plugin. Reply with exactly: ok'
@@ -217,6 +222,48 @@ async function viewOf($: EngineInterface): Promise<View> {
 /** The moment of a draw, and the events its movements run from. */
 async function motionOf($: EngineInterface): Promise<Motion> {
   return { now: await $.clock.now(), openedAt: openedAt ?? null, refill: refill ?? null, pingAt }
+}
+
+// The plain usage figures carry the API's own count; the local summary breakdown (no request sent)
+// adds the compaction window and the categories /context shows.
+async function measureContext($: EngineInterface): Promise<void> {
+  const { context: usage } = await $.session.usage({ breakdown: 'summary' })
+  const b = usage.breakdown
+  const next: ContextMeter = {
+    tokens: usage.tokens,
+    max: b?.rawMaxTokens ?? usage.window,
+    threshold: b?.isAutoCompactEnabled ? b.autoCompactThreshold : undefined,
+    segments: (b?.categories ?? []).map(c => ({ name: c.name, tokens: c.tokens, color: c.color, kind: c.kind })),
+  }
+  await update($, context, () => next)
+}
+
+/** The context window and its controls as a draw needs them. */
+async function contextPartOf($: EngineInterface, tag: string, isWorking: boolean): Promise<ContextPart> {
+  const w = contextWords(tag)
+
+  return {
+    meter: await read($, context),
+    isCompacting: await read($, isCompacting),
+    isLegendOpen: await read($, isLegendOpen),
+    canCompact: !isWorking,
+    onCompact: async () => {
+      await update($, isCompacting, () => true)
+      try {
+        const r = await $.session.compact()
+        if ('skip' in r) $.ui.toast(w.skipped(r.skip))
+        await measureContext($)
+      } catch (err) {
+        // compact() rejects while a turn runs; say so instead of failing silently.
+        $.ui.toast(w.failed(err instanceof Error ? err.message : String(err)))
+      } finally {
+        await update($, isCompacting, () => false)
+      }
+    },
+    onLegend: () => {
+      void update($, isLegendOpen, open => !open)
+    },
+  }
 }
 
 /** Opens the panel, noting when. */
@@ -437,8 +484,17 @@ export const register: Register = on => {
       argumentHint: m.cmdLangHint,
       immediate: true,
     })
+    const result = await next(e)
+    await measureContext($)
 
-    return next(e)
+    return result
+  })
+
+  on('session.measure', async ($, e, next) => {
+    const result = await next(e)
+    await measureContext($)
+
+    return result
   })
 
   on('turn.step', async function* ($, e, next) {
@@ -548,19 +604,24 @@ export const register: Register = on => {
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     const view = await viewOf($)
     const { held } = view
-    if (e.props.hasSurvey || !isTracked(held)) return next(e)
+    const meter = await read($, context)
+    if (e.props.hasSurvey || (!isTracked(held) && meter === null)) return next(e)
     const m = MESSAGES[await langOf($)]
     const beneath = await next(e)
     const els = $.ui.resolve(e)
-    const band = bandView(els, e.surface, m, { ...view, held }, await motionOf($), () => {
+    const band = bandView(els, e.surface, m, view, await motionOf($), () => {
       void openPane($, m.paneTitle)
-    })
+    }, await contextPartOf($, m.tag, e.props.isWorking))
 
     return els.Box({ flexDirection: 'column', children: [beneath, band] })
   })
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
-    return paneView($.ui.resolve(e), e.surface, MESSAGES[await langOf($)], await viewOf($), lastAction, {
+    const m = MESSAGES[await langOf($)]
+    // A pane is not told whether a turn runs; compaction answers for itself then, with a toast.
+    const ctx = await contextPartOf($, m.tag, false)
+
+    return paneView($.ui.resolve(e), e.surface, m, await viewOf($), lastAction, {
       onToggle: () => {
         void update($, auto, held => ({ ...held, isOn: !held.isOn }))
       },
@@ -574,6 +635,6 @@ export const register: Register = on => {
         lastAction = (await ping($, false)).text
         $.ui.invalidate('ui.render')
       },
-    }, e.props.bodyColumns, await motionOf($))
+    }, e.props.bodyColumns, await motionOf($), ctx)
   })
 }

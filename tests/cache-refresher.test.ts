@@ -219,9 +219,9 @@ test('the band draws the countdown on the terminal and the desktop', { timeoutMs
 
   const props = { hasSurvey: false, isWorking: false, maxRows: 10, bodyColumns: 120, scroll: { offset: 0, bodyRows: 10 }, view: {} }
   for (const surface of ['terminal', 'desktop'] as const) {
-    const ui = await $.ui.mount({ plugin: 'cache-refresher', surface, component: 'AbovePrompt', props })
+    const ui = await $.ui.mount({ plugin: 'cache-context', surface, component: 'AbovePrompt', props })
     expect((await ui.find({ type: 'Text', text: '52m' }))?.props.bold).toBe(true)
-    expect((await ui.find({ type: 'Text', text: /expires/ }))?.text).toBe('180k cached · $3.60 to rebuild if it expires')
+    expect(await ui.find({ type: 'Text', text: /expires/ })).toBeUndefined()
     expect(await ui.find({ key: 'details' })).toBeDefined()
     expect((await ui.find({ type: 'Text', text: '●' })) !== undefined).toBe(surface === 'terminal')
     // The desktop draws the lifetime left as a small ring; the terminal marks it with a dot.
@@ -282,12 +282,12 @@ test('the band and card distinguish a model switch from the lifetime running out
   const paneProps = { title: 'Prompt cache', isFocused: true, bodyColumns: 60, placement: 'dock' as const, scroll: { offset: 0, bodyRows: 40 }, view: {} }
   const displays = async (head: string, other: string) => {
     for (const surface of ['terminal', 'desktop'] as const) {
-      const band = await $.ui.mount({ plugin: 'cache-refresher', surface, component: 'AbovePrompt', props: bandProps })
+      const band = await $.ui.mount({ plugin: 'cache-context', surface, component: 'AbovePrompt', props: bandProps })
       expect((await band.find({ type: 'Text', text: head }))?.props.bold).toBe(true)
       expect(await band.find({ type: 'Text', text: other })).toBeUndefined()
       await band.unmount()
 
-      const pane = await $.ui.mount({ plugin: 'cache-refresher', surface, component: 'Pane', requestId: 'cache', props: paneProps })
+      const pane = await $.ui.mount({ plugin: 'cache-context', surface, component: 'Pane', requestId: 'cache', props: paneProps })
       if (surface === 'desktop') {
         const card = String((await pane.findAll({ type: 'Svg' })).find(one => one.props.width === 238)!.props.source)
         expect(card).toContain(`>${head}</text>`)
@@ -343,20 +343,20 @@ test('a small cache with no worthwhile refreshes explains the costs and plan', {
   expect(enabled.text).toContain('  Auto-refresh: on (limit 12), but not sending: a refresh would cost more than an expiry adds for this cache')
 
   const bandProps = { hasSurvey: false, isWorking: false, maxRows: 10, bodyColumns: 120, scroll: { offset: 0, bodyRows: 10 }, view: {} }
-  const band = await $.ui.mount({ plugin: 'cache-refresher', surface: 'desktop', component: 'AbovePrompt', props: bandProps })
-  expect((await band.find({ type: 'Text', text: /cached/ }))?.text).toBe('1k cached · $0.0026 to rebuild if it expires')
+  const band = await $.ui.mount({ plugin: 'cache-context', surface: 'desktop', component: 'AbovePrompt', props: bandProps })
+  expect(await band.find({ type: 'Text', text: /cached/ })).toBeUndefined()
   expect(JSON.stringify(await band.drawn())).not.toContain('0/0')
   await band.unmount()
 
   const props = { title: 'Prompt cache', isFocused: true, bodyColumns: 60, placement: 'dock' as const, scroll: { offset: 0, bodyRows: 40 }, view: {} }
-  const term = await $.ui.mount({ plugin: 'cache-refresher', surface: 'terminal', component: 'Pane', requestId: 'cache', props })
+  const term = await $.ui.mount({ plugin: 'cache-context', surface: 'terminal', component: 'Pane', requestId: 'cache', props })
   expect(await term.find({ type: 'Text', text: 'Refreshing costs more than rebuilding here' })).toBeDefined()
   expect(await term.find({ type: 'Text', text: /0 refreshes/ })).toBeUndefined()
   expect(await term.find({ type: 'Text', text: 'Not worth it for this cache' })).toBeDefined()
   expect(await term.find({ type: 'Text', text: 'None left until next message' })).toBeUndefined()
   await term.unmount()
 
-  const desk = await $.ui.mount({ plugin: 'cache-refresher', surface: 'desktop', component: 'Pane', requestId: 'cache', props })
+  const desk = await $.ui.mount({ plugin: 'cache-context', surface: 'desktop', component: 'Pane', requestId: 'cache', props })
   const drawings = await desk.findAll({ type: 'Svg' })
   const card = String(drawings.filter(one => one.props.height === 94).at(-1)!.props.source)
   expect(card).toContain('>Refreshing costs more than rebuilding here</text>')
@@ -492,9 +492,9 @@ test('the mod speaks Chinese when the person pins it, in the report and the band
   expect(status.text).toContain('自动续期：已关闭')
 
   const props = { hasSurvey: false, isWorking: false, maxRows: 10, bodyColumns: 120, scroll: { offset: 0, bodyRows: 10 }, view: {} }
-  const ui = await $.ui.mount({ plugin: 'cache-refresher', surface: 'desktop', component: 'AbovePrompt', props })
+  const ui = await $.ui.mount({ plugin: 'cache-context', surface: 'desktop', component: 'AbovePrompt', props })
   expect((await ui.find({ type: 'Text', text: '52m' }))?.props.bold).toBe(true)
-  expect((await ui.find({ type: 'Text', text: /过期/ }))?.text).toBe('已缓存 180k · 过期重建约 $3.60')
+  expect(await ui.find({ type: 'Text', text: /过期/ })).toBeUndefined()
   expect((await ui.find({ key: 'details' }))?.text).toContain('详情')
 })
 
@@ -534,7 +534,7 @@ test('the panel draws the dial, sets a lapse against a ping, and its buttons dri
   const props = { title: 'Prompt cache', isFocused: true, bodyColumns: 60, placement: 'dock' as const, scroll: { offset: 0, bodyRows: 40 }, view: {} }
 
   // The terminal: words and rules of cells, no drawings.
-  const term = await $.ui.mount({ plugin: 'cache-refresher', surface: 'terminal', component: 'Pane', requestId: 'cache', props })
+  const term = await $.ui.mount({ plugin: 'cache-context', surface: 'terminal', component: 'Pane', requestId: 'cache', props })
   expect(await term.findAll({ type: 'Svg' })).toHaveLength(0)
   expect((await term.find({ type: 'Text', text: '52m' }))?.props.bold).toBe(true)
   expect(await term.find({ type: 'Text', text: 'left · 180k tokens cached' })).toBeDefined()
@@ -562,7 +562,7 @@ test('the panel draws the dial, sets a lapse against a ping, and its buttons dri
   await term.press({ key: 'cap-down' })
 
   // The desktop: everything that is read is drawn in one type, at the sizes measured on the app; only buttons are the app's own.
-  const desk = await $.ui.mount({ plugin: 'cache-refresher', surface: 'desktop', component: 'Pane', requestId: 'cache', props })
+  const desk = await $.ui.mount({ plugin: 'cache-context', surface: 'desktop', component: 'Pane', requestId: 'cache', props })
   const drawings = await desk.findAll({ type: 'Svg' })
   // Three drawings for the card instead of one, then the same six drawings for the controls and footer.
   expect(drawings).toHaveLength(9)
@@ -680,7 +680,7 @@ test('the drawings move when the cache\'s state does, and a redraw carries a mov
 
   const props = { title: 'Prompt cache', isFocused: true, bodyColumns: 60, placement: 'dock' as const, scroll: { offset: 0, bodyRows: 40 }, view: {} }
   const card = async () => {
-    const pane = await $.ui.mount({ plugin: 'cache-refresher', surface: 'desktop', component: 'Pane', requestId: 'cache', props })
+    const pane = await $.ui.mount({ plugin: 'cache-context', surface: 'desktop', component: 'Pane', requestId: 'cache', props })
     const drawings = await pane.findAll({ type: 'Svg' })
     const source = {
       ring: String(drawings.filter(one => one.props.width === 60).at(-1)!.props.source),
@@ -694,7 +694,7 @@ test('the drawings move when the cache\'s state does, and a redraw carries a mov
   const bandProps = { hasSurvey: false, isWorking: false, maxRows: 10, bodyColumns: 120, scroll: { offset: 0, bodyRows: 10 }, view: {} }
   // What the band draws at this moment: its head's color, its ring, and what sits before the way into the panel.
   const band = async (head: string) => {
-    const ui = await $.ui.mount({ plugin: 'cache-refresher', surface: 'desktop', component: 'AbovePrompt', props: bandProps })
+    const ui = await $.ui.mount({ plugin: 'cache-context', surface: 'desktop', component: 'AbovePrompt', props: bandProps })
     const strip = (await ui.drawn()).children.at(-1)
     const seen = {
       color: (await ui.find({ type: 'Text', text: head }))?.props.color,
@@ -824,11 +824,11 @@ async function drawingSession($: any, on: any, ttl = '1h', options: { model?: st
     await step.result
   }
   const band = (hasSurvey = false) => $.ui.mount({
-    plugin: 'cache-refresher', surface: 'desktop', component: 'AbovePrompt',
+    plugin: 'cache-context', surface: 'desktop', component: 'AbovePrompt',
     props: { hasSurvey, isWorking: false, maxRows: 10, bodyColumns: 120, scroll: { offset: 0, bodyRows: 10 }, view: {} },
   })
   const card = () => $.ui.mount({
-    plugin: 'cache-refresher', surface: 'desktop', component: 'Pane', requestId: 'cache',
+    plugin: 'cache-context', surface: 'desktop', component: 'Pane', requestId: 'cache',
     props: { title: 'Prompt cache', isFocused: true, bodyColumns: 60, placement: 'dock', scroll: { offset: 0, bodyRows: 40 }, view: {} },
   })
   // What a site draws at this moment: its ring, and for the panel its bars, as sources; and every drawing it has.
