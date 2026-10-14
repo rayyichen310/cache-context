@@ -4,6 +4,10 @@ A Claude Code mod that puts two things above the prompt: how long the prompt cac
 
 [中文說明](#中文說明)
 
+## Why
+
+With Claude Code 2.1.295 in the desktop app, the usage popover in my local sessions stopped showing the context window: only plan usage was left. This mod brings the context window back, and merges it into cache-refresher so the cache countdown and the context fill share one line above the prompt.
+
 ## What it adds to cache-refresher
 
 - **A second ring on the band.** Next to the cache countdown, a blue ring fills with the share of the context window in use, followed by the figures: `Context 182.6k/350k (52%)`.
@@ -13,6 +17,16 @@ A Claude Code mod that puts two things above the prompt: how long the prompt cac
 To keep the band to one line, the cache's token count, rebuild cost and auto-refresh count move from the band into the panel, which already shows them.
 
 Everything else is cache-refresher's own, unchanged: the countdown, auto-refresh, the commands (`/cache-status`, `/cache-panel`, `/cache-ping`, `/cache-auto`, `/cache-lang`) and their behaviour. See its README for those.
+
+## Screenshots
+
+The band above the prompt, with the cache countdown, the context fill and the compact button:
+
+![The band above the prompt](docs/band.png)
+
+The panel (**Details**), with the context section and its legend open above cache-refresher's own panel:
+
+![The panel with the legend open](docs/panel.png)
 
 ## Where the numbers come from
 
@@ -65,6 +79,8 @@ MIT, as cache-refresher. See [LICENSE](LICENSE); the original copyright notice i
 
 ## 中文說明
 
+**緣由**：桌面 app 搭配 Claude Code 2.1.295 時，我本機 session 右下角的用量彈窗不再顯示上下文視窗，只剩方案用量。所以我用 mod 把這個功能加回來，並和 cache-refresher 合併，讓快取倒數和上下文用量放在輸入框上方同一行。
+
 一個 Claude Code mod，在輸入框上方同時顯示兩件事：提示快取還剩多久，以及上下文視窗用了多少。它從 [olddonkey/cache-refresher](https://github.com/olddonkey/cache-refresher) 0.2.2 改來，原版負責前者，這個分支加上後者。
 
 **比原版多了什麼**
@@ -74,5 +90,15 @@ MIT, as cache-refresher. See [LICENSE](LICENSE); the original copyright notice i
 - **詳情面板最上方的「背景資訊視窗」**：仿照桌面 app 原本的用量彈窗，有依類別上色的分段條和「距自動壓縮剩多少」。點「顏色說明」會展開每個顏色代表的類別、token 數和佔比。
 
 為了讓那一行放得下，快取的 token 數、過期重建成本和自動續期次數都移到詳情面板裡（面板原本就有這些資訊）。其他功能（倒數、自動續期、各指令）都和原版一樣。
+
+**截圖**（介面語言為英文）
+
+輸入框上方那一行：快取倒數、上下文用量和壓縮按鈕。
+
+![輸入框上方那一行](docs/band.png)
+
+點「Details」打開的詳情面板：最上方是上下文區塊（顏色說明已展開），下面是原版的快取面板。
+
+![展開顏色說明的詳情面板](docs/panel.png)
 
 **安裝**：在終端機的 `claude` 裡輸入上面那行 `/plugin install …`。如果也裝了原版 cache-refresher，請把原版停用，否則會畫出兩行，指令也會重複。
