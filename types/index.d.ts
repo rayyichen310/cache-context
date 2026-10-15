@@ -55,7 +55,25 @@ export type ContextMeter = {
   /** Where auto-compaction runs; absent when it is off. */
   threshold?: number
   segments: Segment[]
+  /** The lists beneath the legend; absent from a measure an earlier version of the mod left in the session. */
+  lists?: ContextLists
 }
+
+/** A file the panel names: its path where one was found, null where it is listed by name alone. */
+export type ContextFile = {
+  name: string
+  path: string | null
+}
+
+/** The lists beneath the legend, as /context lists them beneath its grid. */
+export type ContextLists = {
+  /** Each MCP server with its tool count, loaded or on demand. */
+  mcpServers: { name: string; tools: number }[]
+  memoryFiles: ContextFile[]
+  agents: ContextFile[]
+}
+
+export type ContextListKey = 'mcp' | 'memory' | 'agents'
 
 declare module 'claude-code' {
   interface PluginState {
@@ -65,6 +83,7 @@ declare module 'claude-code' {
       context: ContextMeter | null
       isCompacting: boolean
       isLegendOpen: boolean
+      openLists: ContextListKey[]
     }
   }
 }

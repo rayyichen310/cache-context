@@ -1,7 +1,7 @@
 import type { Elements, RenderElement, RenderNode } from 'claude-code'
 
-import type { ContextMeter, Snapshot } from '../types'
-import { CONTEXT_BLUE, barRuns, barSvg, contextWords, fillRingSvg, fillText, fmtK, hexOf, percentOf, toAutoText } from './context'
+import type { ContextFile, ContextListKey, ContextLists, ContextMeter, Segment, Snapshot } from '../types'
+import { CONTEXT_BLUE, amountText, barRuns, barSvg, contextWords, fillRingSvg, fillText, fmtK, hexOf, legendGroups, percentOf, toAutoText } from './context'
 import type { ContextWords } from './context'
 import { TTL_MS, fmtRemaining, fmtSpan, fmtTokens, fmtUsd } from './economics'
 import { MESSAGES } from './messages'
@@ -343,6 +343,11 @@ export type ContextPart = {
   canCompact: boolean
   onCompact: () => void
   onLegend: () => void
+  /** Which lists beneath the legend are open. */
+  openLists: readonly ContextListKey[]
+  onList: (key: ContextListKey) => void
+  /** Opens a file the lists name, with the app the system gives its type. */
+  onOpen: (path: string) => void
 }
 
 /** The compact control, or what stands in its place while one runs; nothing while a turn runs. */
@@ -408,28 +413,48 @@ export function bandView(
   return Box({ flexDirection: 'row', columnGap: 1, alignItems: 'center', width: '100%', children })
 }
 
-/** The panel's context section: the fill, the segmented bar, the room to auto-compact with compact, and the legend. */
-/** A row of words at both ends of the panel's width, in the card's type: the title or a legend row. */
-function splitSvg(left: string, right: string, style: 'title' | 'legend', locale: DrawingLocale, swatch: string | null = null): { source: string; height: number } {
-  const width = PANEL_PIXELS
+/**
+ * A row of words at both ends of a width, in the card's type: a heading (`title`), a list's count beside
+ * its control (`count`), or an entry of an opened list (`item`).
+ */
+function splitSvg(left: string, right: string, style: 'title' | 'count' | 'item', locale: DrawingLocale, width = PANEL_PIXELS): { source: string; height: number } {
   const isTitle = style === 'title'
-  const height = isTitle ? 20 : 18
-  const size = isTitle ? 14 : 12
-  const y = isTitle ? 14.5 : 13
-  // A legend row leaves room at its left for the swatch, drawn in the category's colour or as an empty box.
-  const x = style === 'legend' ? 16 : 0
-  const box = style === 'legend'
-    ? swatch !== null
-      ? `<rect x="0" y="4" width="10" height="10" rx="2" fill="${swatch}"/>`
-      : `<rect x="0.5" y="4.5" width="9" height="9" rx="2" fill="none" stroke="${TRACK}"/>`
-    : ''
-  const leftText = `<text x="${x}" y="${y}" font-size="${size}"${isTitle ? ' font-weight="600"' : ''} class="${isTitle ? 'ink' : 'sec'}" fill="${isTitle ? INK : SECONDARY}">${escapeXml(left)}</text>`
+  const height = style === 'item' ? 18 : 20
+  const size = style === 'item' ? 12 : 14
+  const y = style === 'item' ? 13 : 14.5
+  const leftText = left === '' ? '' : `<text x="0" y="${y}" font-size="${size}"${isTitle ? ' font-weight="600"' : ''} class="${isTitle ? 'ink' : 'sec'}" fill="${isTitle ? INK : SECONDARY}">${escapeXml(left)}</text>`
   const rightText = `<text x="${width}" y="${y}" font-size="${size}" text-anchor="end" class="sec" fill="${SECONDARY}" style="font-variant-numeric:tabular-nums">${escapeXml(right)}</text>`
 
-  return { height, source: `<svg xmlns="http://www.w3.org/2000/svg" lang="${locale.tag}" viewBox="0 0 ${width} ${height}">${styleOf(locale.fonts)}${box}${leftText}${rightText}</svg>` }
+  return { height, source: `<svg xmlns="http://www.w3.org/2000/svg" lang="${locale.tag}" viewBox="0 0 ${width} ${height}">${styleOf(locale.fonts)}${leftText}${rightText}</svg>` }
 }
 
-/** The panel's context section: the fill, the segmented bar, the room to auto-compact with compact, and the legend. */
+// A legend row's columns, as the app's popover sets them: the share against the right edge, the tokens before it.
+const SHARE_PIXELS = 50
+const TOKENS_GAP_PIXELS = 10
+
+/** One legend row: the swatch (an empty box where nothing is drawn), the name, its tokens, and its share or, on demand, a dash. */
+function legendRowSvg(name: string, tokens: string, share: string | null, swatch: string | null, locale: DrawingLocale): { source: string; height: number } {
+  const width = PANEL_PIXELS
+  const height = 18
+  const box = swatch !== null
+    ? `<rect x="0" y="4" width="10" height="10" rx="2" fill="${swatch}"/>`
+    : `<rect x="0.5" y="4.5" width="9" height="9" rx="2" fill="none" stroke="${TRACK}"/>`
+  const isDeferred = share === null
+  const numerals = 'style="font-variant-numeric:tabular-nums"'
+  const nameText = `<text x="16" y="13" font-size="12" class="${isDeferred ? 'sec' : 'ink'}" fill="${isDeferred ? SECONDARY : INK}">${escapeXml(name)}</text>`
+  const tokensText = `<text x="${width - SHARE_PIXELS - TOKENS_GAP_PIXELS}" y="13" font-size="12" text-anchor="end" class="sec" fill="${SECONDARY}" ${numerals}>${escapeXml(tokens)}</text>`
+  const shareText = isDeferred
+    ? `<text x="${width}" y="13" font-size="12" text-anchor="end" class="sec" fill="${SECONDARY}">—</text>`
+    : `<text x="${width}" y="13" font-size="12" font-weight="600" text-anchor="end" class="ink" fill="${INK}" ${numerals}>${escapeXml(share)}</text>`
+
+  return { height, source: `<svg xmlns="http://www.w3.org/2000/svg" lang="${locale.tag}" viewBox="0 0 ${width} ${height}">${styleOf(locale.fonts)}${box}${nameText}${tokensText}${shareText}</svg>` }
+}
+
+/**
+ * The panel's context section, laid out as the app's own popover: the share in use over the fill, the
+ * segmented bar, and the room to auto-compact with compact, always shown; then, behind the legend control,
+ * the legend largest first, what loads on demand apart, and the lists beneath it.
+ */
 function contextSection(els: Els, surface: Surface, m: Messages, ctx: ContextPart, columns: number): RenderNode | null {
   const meter = ctx.meter
   if (meter === null) return null
@@ -438,17 +463,21 @@ function contextSection(els: Els, surface: Surface, m: Messages, ctx: ContextPar
   const w = contextWords(m.tag)
   const between = (children: RenderNode[]) =>
     Box({ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', columnGap: 2, children })
-  const fill = fillText(meter, w)
+  const used = w.used(percentOf(meter))
+  const amount = amountText(meter, w)
   const toAuto = toAutoText(meter, w) ?? ''
   const control = compactControl(els, w, ctx)
+  const hex = hexOf(meter)
   const rows: RenderNode[] = []
 
   // The desktop draws the words in the card's own type, as the rest of the panel does; the terminal in its text.
   if (Svg) {
-    const head = splitSvg(w.title, fill, 'title', m)
+    const title = labelSvg(w.title, PANEL_PIXELS, 'title', m)
+    const head = splitSvg(used, amount, 'title', m)
     rows.push(
-      Svg({ alt: `${w.title} ${fill}`, width: PANEL_PIXELS, height: head.height, source: head.source }),
-      Svg({ alt: `${w.title} ${fill}`, width: PANEL_PIXELS, height: 6, source: barSvg(meter, PANEL_PIXELS, m.tag) }),
+      Svg({ alt: w.title, width: PANEL_PIXELS, height: title.height, source: title.source }),
+      Svg({ alt: `${used} ${amount}`, width: PANEL_PIXELS, height: head.height, source: head.source }),
+      Svg({ alt: `${used} ${amount}`, width: PANEL_PIXELS, height: 6, source: barSvg(meter, PANEL_PIXELS, m.tag) }),
     )
     // Drawn only as wide as its words (14px type, about 7.3px a cell), so the compact button keeps the rest of the row.
     const wordsWidth = Math.min(LABEL_PIXELS, Math.ceil(cells(toAuto) * 7.3))
@@ -457,45 +486,99 @@ function contextSection(els: Els, surface: Surface, m: Messages, ctx: ContextPar
   } else {
     const width = Math.max(10, Math.min(PANEL_CELLS, columns) - 2)
     rows.push(
-      between([Text({ bold: true, children: [w.title] }), Text({ dimColor: true, children: [fill] })]),
+      Text({ bold: true, children: [w.title] }),
+      between([Text({ bold: true, children: [used] }), Text({ dimColor: true, children: [amount] })]),
       Box({
         flexDirection: 'row',
         children: barRuns(meter, width).map(run =>
-          run.segment ? Text({ color: run.segment.color, children: ['█'.repeat(run.cells)] }) : Text({ dimColor: true, children: ['░'.repeat(run.cells)] }),
+          run.segment ? Text({ color: hex.get(run.segment), children: ['█'.repeat(run.cells)] }) : Text({ dimColor: true, children: ['░'.repeat(run.cells)] }),
         ),
       }),
       between([Text({ dimColor: true, children: [toAuto] }), ...(control === null ? [] : [control])]),
     )
   }
   rows.push(Button({ key: 'legend', label: ctx.isLegendOpen ? w.legendHide : w.legendShow, plain: true, dimColor: true, onPress: ctx.onLegend }))
+  if (!ctx.isLegendOpen) return Box({ flexDirection: 'column', rowGap: Svg ? 1 : 0, children: rows })
 
-  if (ctx.isLegendOpen) {
-    const hex = hexOf(meter)
-    const pct = (n: number) => `${((n / meter.max) * 100).toFixed(1)}%`
-    // What loads on demand takes no room, so it goes last.
-    const ordered = [...meter.segments.filter(s => s.kind !== 'deferred'), ...meter.segments.filter(s => s.kind === 'deferred')]
-    const legend: RenderNode[] = ordered.map(s => {
-      const amount = s.kind === 'deferred' ? `${fmtK(s.tokens)}${w.aside(w.deferred)}` : `${fmtK(s.tokens)} · ${pct(s.tokens)}`
-      if (Svg) {
-        const row = splitSvg(s.name, amount, 'legend', m, hex.get(s) ?? null)
+  const share = (n: number) => `${((n / meter.max) * 100).toFixed(1)}%`
+  const legendRow = (s: Segment): RenderNode => {
+    const isDeferred = s.kind === 'deferred'
+    const tokens = fmtK(s.tokens)
+    const shown = isDeferred ? '—' : share(s.tokens)
+    if (Svg) {
+      const row = legendRowSvg(s.name, tokens, isDeferred ? null : shown, hex.get(s) ?? null, m)
 
-        return Svg({ alt: `${s.name} ${amount}`, width: PANEL_PIXELS, height: row.height, source: row.source })
-      }
-      const swatch = s.kind === 'free' || s.kind === 'deferred'
-        ? Text({ dimColor: true, children: ['░'] })
-        : Text({ color: s.color, children: ['█'] })
+      return Svg({ alt: `${s.name} ${tokens} ${shown}`, width: PANEL_PIXELS, height: row.height, source: row.source })
+    }
+    const color = hex.get(s)
 
-      return Box({
-        flexDirection: 'row',
-        columnGap: 1,
-        alignItems: 'center',
-        children: [swatch, Text({ dimColor: s.kind === 'deferred', children: [s.name] }), Box({ flexGrow: 1, children: [] }), Text({ dimColor: true, children: [amount] })],
-      })
+    return Box({
+      flexDirection: 'row',
+      columnGap: 1,
+      alignItems: 'center',
+      children: [
+        color === undefined ? Text({ dimColor: true, children: ['░'] }) : Text({ color, children: ['█'] }),
+        Text({ dimColor: isDeferred, wrap: 'truncate-end', children: [s.name] }),
+        Box({ flexGrow: 1, children: [] }),
+        Text({ dimColor: true, children: [tokens] }),
+        Box({ width: 6, flexShrink: 0, justifyContent: 'flex-end', children: [Text({ bold: !isDeferred, dimColor: isDeferred, children: [shown] })] }),
+      ],
     })
-    rows.push(Box({ flexDirection: 'column', children: legend }))
   }
+  const { inWindow, deferred } = legendGroups(meter)
+  rows.push(Box({ flexDirection: 'column', children: inWindow.map(legendRow) }))
+  if (deferred.length > 0) rows.push(Box({ flexDirection: 'column', children: deferred.map(legendRow) }))
+  if (meter.lists !== undefined) rows.push(...listRows(els, Svg, m, w, ctx, meter.lists))
 
   return Box({ flexDirection: 'column', rowGap: Svg ? 1 : 0, children: rows })
+}
+
+/** The lists beneath the legend, each behind its own control with its count; a file found on disk opens on a press. */
+function listRows(els: Els, Svg: ReturnType<typeof svgOf>, m: Messages, w: ContextWords, ctx: ContextPart, lists: ContextLists): RenderNode[] {
+  const { Box, Text, Button } = els
+  const itemWidth = PANEL_PIXELS - 16
+  const plainLine = (left: string, right = ''): RenderNode => {
+    if (!Svg) {
+      return Box({ flexDirection: 'row', children: [Text({ dimColor: true, wrap: 'truncate-end', children: [left] }), Box({ flexGrow: 1, children: [] }), Text({ dimColor: true, children: [right] })] })
+    }
+    const row = splitSvg(left, right, 'item', m, itemWidth)
+
+    return Svg({ alt: `${left} ${right}`.trim(), width: itemWidth, height: row.height, source: row.source })
+  }
+  const fileLine = (key: string, file: ContextFile): RenderNode => {
+    const path = file.path
+
+    return path === null ? plainLine(file.name) : Button({ key, label: file.name, plain: true, dimColor: true, onPress: () => ctx.onOpen(path) })
+  }
+  const entries: { key: ContextListKey; count: number; items: () => RenderNode[] }[] = [
+    {
+      key: 'mcp',
+      count: lists.mcpServers.reduce((sum, server) => sum + server.tools, 0),
+      items: () => lists.mcpServers.map(server => plainLine(server.name, String(server.tools))),
+    },
+    { key: 'memory', count: lists.memoryFiles.length, items: () => lists.memoryFiles.map((file, i) => fileLine(`memory-${i}`, file)) },
+    { key: 'agents', count: lists.agents.length, items: () => lists.agents.map((file, i) => fileLine(`agent-${i}`, file)) },
+  ]
+  const rows: RenderNode[] = []
+  for (const { key, count, items } of entries) {
+    if (count === 0) continue
+    const isOpen = ctx.openLists.includes(key)
+    const counted = String(count)
+    let countNode: RenderNode = Text({ dimColor: true, children: [counted] })
+    if (Svg) {
+      const drawn = splitSvg('', counted, 'count', m, 48)
+      countNode = Svg({ alt: counted, width: 48, height: drawn.height, source: drawn.source })
+    }
+    rows.push(Box({
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      children: [Button({ key: `list-${key}`, label: `${isOpen ? '⌄' : '›'} ${w.lists[key]}`, plain: true, onPress: () => ctx.onList(key) }), countNode],
+    }))
+    if (isOpen) rows.push(Box({ flexDirection: 'column', paddingLeft: 2, children: items() }))
+  }
+
+  return rows
 }
 
 /** The panel: the display card, then the keep-alive switch, its budget, and how the cache has held. */

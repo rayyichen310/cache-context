@@ -1,8 +1,9 @@
 import { atom, read, update } from 'claude-code'
-import type { EngineInterface, ModelUsage, Register } from 'claude-code'
+import type { ContextAgent, EngineInterface, ModelUsage, Register, SessionContextBreakdown } from 'claude-code'
 
-import type { ContextMeter, Snapshot, Ttl } from '../types'
+import type { ContextFile, ContextLists, ContextListKey, ContextMeter, Snapshot, Ttl } from '../types'
 import { contextWords } from './context'
+import type { ContextWords } from './context'
 import { detect, follow } from './detect'
 import { PING_MARGIN_MS, TTL_MS, WRITE_MULTIPLIER, fmtRemaining, fmtTokens, fmtUsd, priceOf } from './economics'
 import { LANGS, MESSAGES, langFrom } from './messages'
@@ -39,6 +40,7 @@ const auto = atom({ plugin: 'cache-context', key: 'auto' } as const, {
 const context = atom({ plugin: 'cache-context', key: 'context' } as const, null)
 const isCompacting = atom({ plugin: 'cache-context', key: 'isCompacting' } as const, false)
 const isLegendOpen = atom({ plugin: 'cache-context', key: 'isLegendOpen' } as const, false)
+const openLists = atom({ plugin: 'cache-context', key: 'openLists' } as const, [] as ContextListKey[])
 
 const PING_PROMPT =
   'Prompt-cache keep-alive from the cache-refresher plugin. Reply with exactly: ok'
@@ -236,8 +238,60 @@ async function measureContext($: EngineInterface): Promise<void> {
     max: b?.rawMaxTokens ?? usage.window,
     threshold: b?.isAutoCompactEnabled ? b.autoCompactThreshold : undefined,
     segments: (b?.categories ?? []).map(c => ({ name: c.name, tokens: c.tokens, color: c.color, kind: c.kind })),
+    lists: b === undefined ? undefined : await listsOf($, b),
   }
   await update($, context, () => next)
+}
+
+/** A path under a base, in the base's own separator. */
+function joinPath(base: string, ...parts: string[]): string {
+  const sep = base.includes('\\') ? '\\' : '/'
+
+  return [base.replace(/[\\/]+$/, ''), ...parts].join(sep)
+}
+
+/** The path shown for a file: under the home directory as `~`. */
+function shownPath(path: string, home: string | undefined): string {
+  return home !== undefined && path.toLowerCase().startsWith(home.toLowerCase()) ? `~${path.slice(home.length)}` : path
+}
+
+/**
+ * Where a custom agent's file is, by the settings it came from: the person's own or the project's agents
+ * folder, under the agent's name. Null for a plugin's agent, whose file the breakdown does not say, and for
+ * a file not found there, so the panel never offers a press that opens nothing.
+ */
+async function agentPath($: EngineInterface, agent: ContextAgent, home: string | undefined): Promise<string | null> {
+  const base = agent.source === 'userSettings' ? home : agent.source === 'projectSettings' ? await $.session.cwd() : undefined
+  if (base === undefined) return null
+  const path = joinPath(base, '.claude', 'agents', `${agent.agentType}.md`)
+  const found = await $.fs.stat(path).catch(() => undefined)
+
+  return found?.kind === 'file' ? path : null
+}
+
+/** The lists beneath the legend: the MCP servers by tool count, the memory files and the custom agents. */
+async function listsOf($: EngineInterface, b: SessionContextBreakdown): Promise<ContextLists> {
+  const home = (await $.env.get('USERPROFILE')) ?? (await $.env.get('HOME'))
+  const servers = new Map<string, number>()
+  for (const tool of b.mcpTools) servers.set(tool.serverName, (servers.get(tool.serverName) ?? 0) + 1)
+  const agents: ContextFile[] = []
+  for (const agent of b.agents) agents.push({ name: agent.agentType, path: await agentPath($, agent, home) })
+
+  return {
+    mcpServers: [...servers].map(([name, tools]) => ({ name, tools })).sort((x, y) => y.tools - x.tools),
+    memoryFiles: b.memoryFiles.map(file => ({ name: shownPath(file.path, home), path: file.path })),
+    agents,
+  }
+}
+
+/** Opens a file with the app the system gives its type: `start` on Windows, `open` on macOS, `xdg-open` elsewhere. */
+async function openFile($: EngineInterface, path: string, w: ContextWords): Promise<void> {
+  const tries = /^[A-Za-z]:[\\/]/.test(path) ? [['cmd', '/c', 'start', '', path]] : [['open', path], ['xdg-open', path]]
+  for (const argv of tries) {
+    const ran = await $.process.run(argv).catch(() => undefined)
+    if (ran?.exitCode === 0) return
+  }
+  $.ui.toast(w.openFailed(path))
 }
 
 /** The context window and its controls as a draw needs them. */
@@ -269,6 +323,13 @@ async function contextPartOf($: EngineInterface, tag: string, isWorking: boolean
     },
     onLegend: () => {
       void update($, isLegendOpen, open => !open)
+    },
+    openLists: await read($, openLists),
+    onList: key => {
+      void update($, openLists, open => (open.includes(key) ? open.filter(one => one !== key) : [...open, key]))
+    },
+    onOpen: path => {
+      void openFile($, path, w)
     },
   }
 }
