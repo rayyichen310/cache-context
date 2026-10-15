@@ -95,7 +95,7 @@ async function setUp($: Parameters<Parameters<typeof test>[1]>[0], on: Parameter
   mock.clock(on, { now: 1_700_000_000_000 })
   mock.store(on)
   mock.env(on, { LANG: lang === 'en' ? 'en_US.UTF-8' : 'zh_TW.UTF-8', USERPROFILE: 'C:\\Users\\ray' })
-  const calls = { compacted: 0, toasts: [] as string[], commands: [] as string[], ran: [] as string[][], stats: [] as string[] }
+  const calls = { compacted: 0, toasts: [] as string[], commands: [] as string[], ran: [] as string[][], stats: [] as string[], breakdowns: [] as string[] }
   // Of the agents' files, only scout's is on disk.
   on('fs.stat', (_, e) => {
     calls.stats.push(e.path)
@@ -106,7 +106,10 @@ async function setUp($: Parameters<Parameters<typeof test>[1]>[0], on: Parameter
     calls.ran.push([...e.argv])
     return { value: { exitCode: 0, stdout: '', stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
   })
-  on('session.usage', () => ({ value: USAGE }))
+  on('session.usage', (_, e) => {
+    if (e.breakdown !== undefined) calls.breakdowns.push(e.breakdown)
+    return { value: USAGE }
+  })
   on('session.measure', () => ({ changed: [] }))
   on('session.compact', () => {
     calls.compacted += 1
@@ -259,4 +262,6 @@ test('the lists beneath the legend open, and a file found on disk opens with the
   // A plugin's agent is never looked for.
   expect(calls.stats.some(path => path.includes('helper'))).toBe(false)
   expect(calls.toasts).toEqual([])
+  // Counted as the app's own popover counts, so the rows read the same figures.
+  expect(new Set(calls.breakdowns)).toEqual(new Set(['full']))
 })

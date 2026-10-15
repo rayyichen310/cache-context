@@ -228,10 +228,11 @@ async function motionOf($: EngineInterface): Promise<Motion> {
   return { now: await $.clock.now(), openedAt: openedAt ?? null, refill: refill ?? null, pingAt }
 }
 
-// The plain usage figures carry the API's own count; the local summary breakdown (no request sent)
-// adds the compaction window and the categories /context shows.
+// The plain usage figures carry the API's own count; the full breakdown adds the compaction window and
+// the categories /context shows, counted with the token-count API as the app's own popover counts them
+// (a summary one estimates locally, and its tool and memory rows came out far from the app's).
 async function measureContext($: EngineInterface): Promise<void> {
-  const { context: usage } = await $.session.usage({ breakdown: 'summary' })
+  const { context: usage } = await $.session.usage({ breakdown: 'full' })
   const b = usage.breakdown
   const next: ContextMeter = {
     tokens: usage.tokens,
