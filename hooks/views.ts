@@ -534,9 +534,9 @@ function contextSection(els: Els, surface: Surface, m: Messages, ctx: ContextPar
   return Box({ flexDirection: 'column', rowGap: Svg ? 1 : 0, children: rows })
 }
 
-// A one-glyph control and the gap after it, beside a list's words: the desktop draws a Button's label in its
-// own type, larger than the legend's, so the words are drawn and only the glyph is the control.
-const GLYPH_PIXELS = 28
+// A one-glyph control and the gap after it, beside a list's words, as wide as the desktop drew them: it draws a
+// Button's label in its own type, larger than the legend's, so the words are drawn and only the glyph is the control.
+const GLYPH_PIXELS = 20
 
 /** The lists beneath the legend, each behind its own control with its count; a file found on disk opens on a press. */
 function listRows(els: Els, Svg: ReturnType<typeof svgOf>, m: Messages, w: ContextWords, ctx: ContextPart, lists: ContextLists): RenderNode[] {
@@ -546,7 +546,8 @@ function listRows(els: Els, Svg: ReturnType<typeof svgOf>, m: Messages, w: Conte
   const drawnLine = (left: string, right: string, style: 'head' | 'item', width: number): RenderNode => {
     const drawn = splitSvg(left, right, style, m, width)
 
-    return Svg!({ alt: `${left} ${right}`.trim(), width, height: drawn.height, source: drawn.source })
+    // Held at its own width: in a row beside a control the desktop stretched the drawing over the slot, its words with it.
+    return Box({ flexShrink: 0, children: [Svg!({ alt: `${left} ${right}`.trim(), width, height: drawn.height, source: drawn.source })] })
   }
   const plainLine = (left: string, right = ''): RenderNode =>
     Svg
