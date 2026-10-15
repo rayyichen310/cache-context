@@ -414,15 +414,16 @@ export function bandView(
 }
 
 /**
- * A row of words at both ends of a width, in the card's type: a heading (`title`), a list's count beside
- * its control (`count`), or an entry of an opened list (`item`).
+ * A row of words at both ends of a width, in the card's type: a heading (`title`), a list's name with its
+ * count (`head`, in the legend's size), or an entry of an opened list (`item`).
  */
-function splitSvg(left: string, right: string, style: 'title' | 'count' | 'item', locale: DrawingLocale, width = PANEL_PIXELS): { source: string; height: number } {
+function splitSvg(left: string, right: string, style: 'title' | 'head' | 'item', locale: DrawingLocale, width = PANEL_PIXELS): { source: string; height: number } {
   const isTitle = style === 'title'
-  const height = style === 'item' ? 18 : 20
-  const size = style === 'item' ? 12 : 14
-  const y = style === 'item' ? 13 : 14.5
-  const leftText = left === '' ? '' : `<text x="0" y="${y}" font-size="${size}"${isTitle ? ' font-weight="600"' : ''} class="${isTitle ? 'ink' : 'sec'}" fill="${isTitle ? INK : SECONDARY}">${escapeXml(left)}</text>`
+  const isInk = style !== 'item'
+  const height = isTitle ? 20 : 18
+  const size = isTitle ? 14 : 12
+  const y = isTitle ? 14.5 : 13
+  const leftText = left === '' ? '' : `<text x="0" y="${y}" font-size="${size}"${isTitle ? ' font-weight="600"' : ''} class="${isInk ? 'ink' : 'sec'}" fill="${isInk ? INK : SECONDARY}">${escapeXml(left)}</text>`
   const rightText = `<text x="${width}" y="${y}" font-size="${size}" text-anchor="end" class="sec" fill="${SECONDARY}" style="font-variant-numeric:tabular-nums">${escapeXml(right)}</text>`
 
   return { height, source: `<svg xmlns="http://www.w3.org/2000/svg" lang="${locale.tag}" viewBox="0 0 ${width} ${height}">${styleOf(locale.fonts)}${leftText}${rightText}</svg>` }
@@ -533,22 +534,32 @@ function contextSection(els: Els, surface: Surface, m: Messages, ctx: ContextPar
   return Box({ flexDirection: 'column', rowGap: Svg ? 1 : 0, children: rows })
 }
 
+// A one-glyph control and the gap after it, beside a list's words: the desktop draws a Button's label in its
+// own type, larger than the legend's, so the words are drawn and only the glyph is the control.
+const GLYPH_PIXELS = 28
+
 /** The lists beneath the legend, each behind its own control with its count; a file found on disk opens on a press. */
 function listRows(els: Els, Svg: ReturnType<typeof svgOf>, m: Messages, w: ContextWords, ctx: ContextPart, lists: ContextLists): RenderNode[] {
   const { Box, Text, Button } = els
   const itemWidth = PANEL_PIXELS - 16
-  const plainLine = (left: string, right = ''): RenderNode => {
-    if (!Svg) {
-      return Box({ flexDirection: 'row', children: [Text({ dimColor: true, wrap: 'truncate-end', children: [left] }), Box({ flexGrow: 1, children: [] }), Text({ dimColor: true, children: [right] })] })
-    }
-    const row = splitSvg(left, right, 'item', m, itemWidth)
+  const row = (children: RenderNode[]) => Box({ flexDirection: 'row', alignItems: 'center', columnGap: 1, children })
+  const drawnLine = (left: string, right: string, style: 'head' | 'item', width: number): RenderNode => {
+    const drawn = splitSvg(left, right, style, m, width)
 
-    return Svg({ alt: `${left} ${right}`.trim(), width: itemWidth, height: row.height, source: row.source })
+    return Svg!({ alt: `${left} ${right}`.trim(), width, height: drawn.height, source: drawn.source })
   }
+  const plainLine = (left: string, right = ''): RenderNode =>
+    Svg
+      ? drawnLine(left, right, 'item', itemWidth)
+      : Box({ flexDirection: 'row', children: [Text({ dimColor: true, wrap: 'truncate-end', children: [left] }), Box({ flexGrow: 1, children: [] }), Text({ dimColor: true, children: [right] })] })
   const fileLine = (key: string, file: ContextFile): RenderNode => {
     const path = file.path
+    if (path === null) return plainLine(file.name)
+    const open = () => ctx.onOpen(path)
 
-    return path === null ? plainLine(file.name) : Button({ key, label: file.name, plain: true, dimColor: true, onPress: () => ctx.onOpen(path) })
+    return Svg
+      ? row([Button({ key, label: '↗', plain: true, dimColor: true, onPress: open }), drawnLine(file.name, '', 'item', itemWidth - GLYPH_PIXELS)])
+      : Button({ key, label: file.name, plain: true, dimColor: true, onPress: open })
   }
   const entries: { key: ContextListKey; count: number; items: () => RenderNode[] }[] = [
     {
@@ -563,18 +574,18 @@ function listRows(els: Els, Svg: ReturnType<typeof svgOf>, m: Messages, w: Conte
   for (const { key, count, items } of entries) {
     if (count === 0) continue
     const isOpen = ctx.openLists.includes(key)
-    const counted = String(count)
-    let countNode: RenderNode = Text({ dimColor: true, children: [counted] })
-    if (Svg) {
-      const drawn = splitSvg('', counted, 'count', m, 48)
-      countNode = Svg({ alt: counted, width: 48, height: drawn.height, source: drawn.source })
-    }
-    rows.push(Box({
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      children: [Button({ key: `list-${key}`, label: `${isOpen ? '⌄' : '›'} ${w.lists[key]}`, plain: true, onPress: () => ctx.onList(key) }), countNode],
-    }))
+    const glyph = isOpen ? '⌄' : '›'
+    const toggle = () => ctx.onList(key)
+    rows.push(
+      Svg
+        ? row([Button({ key: `list-${key}`, label: glyph, plain: true, onPress: toggle }), drawnLine(w.lists[key], String(count), 'head', PANEL_PIXELS - GLYPH_PIXELS)])
+        : Box({
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            children: [Button({ key: `list-${key}`, label: `${glyph} ${w.lists[key]}`, plain: true, onPress: toggle }), Text({ dimColor: true, children: [String(count)] })],
+          }),
+    )
     if (isOpen) rows.push(Box({ flexDirection: 'column', paddingLeft: 2, children: items() }))
   }
 

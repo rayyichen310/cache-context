@@ -91,7 +91,7 @@ test('only the four largest categories in use take a colour, as in the app; the 
   expect(deferred.map(s => s.name)).toEqual(['MCP tools (deferred)'])
 })
 
-async function setUp($: Parameters<Parameters<typeof test>[1]>[0], on: Parameters<Parameters<typeof test>[1]>[1], lang = 'zh-Hant', isHeadless = false) {
+async function setUp($: Parameters<Parameters<typeof test>[1]>[0], on: Parameters<Parameters<typeof test>[1]>[1], lang = 'zh-Hant', isHeadless = false, usage = USAGE, absent: string[] = []) {
   mock.clock(on, { now: 1_700_000_000_000 })
   mock.store(on)
   mock.env(on, { LANG: lang === 'en' ? 'en_US.UTF-8' : 'zh_TW.UTF-8', USERPROFILE: 'C:\\Users\\ray' })
@@ -103,12 +103,13 @@ async function setUp($: Parameters<Parameters<typeof test>[1]>[0], on: Parameter
     return { value: { kind: 'file' as const, size: 1, mtimeMs: 0, isLink: false } }
   })
   on('process.run', (_, e) => {
+    if (absent.includes(e.argv[0]!)) return { deny: 'ENOENT' }
     calls.ran.push([...e.argv])
     return { value: { exitCode: 0, stdout: '', stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
   })
   on('session.usage', (_, e) => {
     if (e.breakdown !== undefined) calls.breakdowns.push(e.breakdown)
-    return { value: USAGE }
+    return { value: usage }
   })
   on('session.measure', () => ({ changed: [] }))
   on('session.compact', () => {
@@ -236,7 +237,7 @@ test('the lists beneath the legend open, and a file found on disk opens with the
         ? (await pane.findAll({ type: 'Svg' })).map(one => String(one.props.alt))
         : (await pane.findAll({ type: 'Text' })).map(one => one.text ?? '')
     // Each list with its count: every MCP tool counts, loaded or on demand.
-    expect(await shown()).toContain('3')
+    expect(await shown()).toContain(surface === 'desktop' ? 'MCP 工具 3' : '3')
     expect(await pane.find({ key: 'agent-0' })).toBeUndefined()
 
     await pane.press({ key: 'list-mcp' })
@@ -264,4 +265,17 @@ test('the lists beneath the legend open, and a file found on disk opens with the
   expect(calls.toasts).toEqual([])
   // Counted as the app's own popover counts, so the rows read the same figures.
   expect(new Set(calls.breakdowns)).toEqual(new Set(['full']))
+})
+
+test('off Windows a file opens with xdg-open, and with open where there is none', { timeoutMs: 30_000 }, async ($, on) => {
+  const linux = { ...USAGE.context.breakdown, memoryFiles: [{ path: '/home/ray/.claude/CLAUDE.md', type: 'User', tokens: 900 }] }
+  // This system has no xdg-open, as macOS has none.
+  const calls = await setUp($, on, 'zh-Hant', false, { ...USAGE, context: { ...USAGE.context, breakdown: linux } }, ['xdg-open'])
+  const pane = await $.ui.mount({ plugin: 'cache-context', surface: 'desktop', component: 'Pane', requestId: 'cache', props: paneProps })
+  await pane.press({ key: 'legend' })
+  await pane.press({ key: 'list-memory' })
+  await pane.press({ key: 'memory-0' })
+  await pane.unmount()
+  expect(calls.ran).toEqual([['open', '/home/ray/.claude/CLAUDE.md']])
+  expect(calls.toasts).toEqual([])
 })

@@ -285,9 +285,12 @@ async function listsOf($: EngineInterface, b: SessionContextBreakdown): Promise<
   }
 }
 
-/** Opens a file with the app the system gives its type: `start` on Windows, `open` on macOS, `xdg-open` elsewhere. */
+/**
+ * Opens a file with the app the system gives its type: `start` on Windows; elsewhere `xdg-open` (Linux and
+ * the BSDs), then `open` (macOS). xdg-open goes first because some Linux systems have an unrelated `open`.
+ */
 async function openFile($: EngineInterface, path: string, w: ContextWords): Promise<void> {
-  const tries = /^[A-Za-z]:[\\/]/.test(path) ? [['cmd', '/c', 'start', '', path]] : [['open', path], ['xdg-open', path]]
+  const tries = /^[A-Za-z]:[\\/]/.test(path) ? [['cmd', '/c', 'start', '', path]] : [['xdg-open', path], ['open', path]]
   for (const argv of tries) {
     const ran = await $.process.run(argv).catch(() => undefined)
     if (ran?.exitCode === 0) return
