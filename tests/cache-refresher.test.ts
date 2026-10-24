@@ -401,6 +401,47 @@ test('auto keep-alive stays off until it is turned on', { timeoutMs: 30_000 }, a
   expect(status.text).toContain('Auto-refresh: off')
 })
 
+test('the auto-refresh setting is kept for the next start', async ($, on) => {
+  mock.clock(on, { now: START })
+  const kept = new Map<string, unknown>()
+  on('store.get', (_: unknown, e: { key: string }) => ({ value: kept.get(e.key) }))
+  on('store.set', (_: unknown, e: { key: string; value: unknown }) => {
+    kept.set(e.key, e.value)
+
+    return { value: undefined }
+  })
+  mock.env(on, HOUR_ENV)
+  on('session.usage', () => ({ value: { startedAt: START, context: { window: 1_000_000 }, rateLimits: [] } }))
+
+  await boot($, on)
+  await $.command.run({ command: 'cache-auto', args: 'on 5' })
+  expect(kept.get('auto')).toEqual({ isOn: true, cap: 5 })
+  await $.command.run({ command: 'cache-auto', args: 'off' })
+  expect(kept.get('auto')).toEqual({ isOn: false, cap: 5 })
+})
+
+test('a kept auto-refresh setting is in force from the start', async ($, on) => {
+  mock.clock(on, { now: START })
+  mock.store(on, { auto: { isOn: true, cap: 5 } })
+  mock.env(on, HOUR_ENV)
+  on('session.usage', () => ({ value: { startedAt: START, context: { window: 1_000_000 }, rateLimits: [] } }))
+
+  await boot($, on)
+  const status = await $.command.run({ command: 'cache-auto', args: '' })
+  expect(status.text).toContain('Auto-refresh: on, up to 5 per idle period')
+})
+
+test('a kept auto-refresh setting of the wrong shape leaves it off', async ($, on) => {
+  mock.clock(on, { now: START })
+  mock.store(on, { auto: { isOn: 'yes', cap: 500 } })
+  mock.env(on, HOUR_ENV)
+  on('session.usage', () => ({ value: { startedAt: START, context: { window: 1_000_000 }, rateLimits: [] } }))
+
+  await boot($, on)
+  const status = await $.command.run({ command: 'cache-auto', args: '' })
+  expect(status.text).toContain('Auto-refresh: off')
+})
+
 test('auto sends one ping per idle stretch until a ping is proven to extend the cache', { timeoutMs: 30_000 }, async ($, on) => {
   const clock = mock.clock(on, { now: START })
   mock.store(on)

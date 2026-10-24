@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
 import type { ContextAgent, EngineInterface, ModelUsage, Register, SessionContextBreakdown } from 'claude-code'
 
-import type { ContextFile, ContextLists, ContextListKey, ContextMeter, Snapshot, Ttl } from '../types'
+import type { Auto, ContextFile, ContextLists, ContextListKey, ContextMeter, Snapshot, Ttl } from '../types'
 import { contextWords } from './context'
 import type { ContextWords } from './context'
 import { detect, follow } from './detect'
@@ -50,6 +50,7 @@ const MAX_OBSERVATIONS = 100
 const EXTENDS = 'pingExtends'
 const LANG = 'lang'
 const HEARD = 'langHeard'
+const AUTO = 'auto'
 
 type TtlChoice = Pick<Snapshot, 'ttl' | 'ttlSource'>
 
@@ -211,6 +212,23 @@ async function knownExtension($: EngineInterface): Promise<Extension> {
 async function learnExtension($: EngineInterface, ttl: Ttl, doesExtend: boolean): Promise<void> {
   extension = { ...(await knownExtension($)), [ttl]: doesExtend }
   await $.store.set(EXTENDS, extension)
+}
+
+/** The auto-refresh setting the store kept; null when none was kept or the value is not one. */
+function keptAuto(held: unknown): Auto | null {
+  if (typeof held !== 'object' || held === null) return null
+  const { isOn, cap } = held as Record<string, unknown>
+  if (typeof isOn !== 'boolean' || typeof cap !== 'number' || !Number.isInteger(cap) || cap < 1 || cap > MAX_CAP) {
+    return null
+  }
+
+  return { isOn, cap }
+}
+
+// The session's state starts over when Claude Code restarts or updates, so the store keeps the switch as well.
+async function setAuto($: EngineInterface, change: (now: Auto) => Auto): Promise<void> {
+  await update($, auto, change)
+  await $.store.set(AUTO, await read($, auto))
 }
 
 async function viewOf($: EngineInterface): Promise<View> {
@@ -509,6 +527,8 @@ async function ping($: EngineInterface, isForced: boolean): Promise<PingResult> 
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     isHeadless = !e.isInteractive
+    const kept = keptAuto(await $.store.get(AUTO))
+    if (kept !== null) await update($, auto, () => kept)
     $.clock.every(1000, async () => {
       const lang = await langOf($)
       const m = MESSAGES[lang]
@@ -656,7 +676,7 @@ export const register: Register = on => {
     const cap = words.map(Number).find(n => Number.isInteger(n) && n > 0 && n <= MAX_CAP)
     if (words.length > 0 && wanted === undefined && cap === undefined) return { text: m.autoUsage(MAX_CAP) }
     if (words.length > 0) {
-      await update($, auto, now => ({
+      await setAuto($, now => ({
         isOn: wanted === undefined ? true : wanted === 'on',
         cap: cap ?? now.cap,
       }))
@@ -696,13 +716,13 @@ export const register: Register = on => {
 
     return paneView($.ui.resolve(e), e.surface, m, await viewOf($), lastAction, {
       onToggle: () => {
-        void update($, auto, held => ({ ...held, isOn: !held.isOn }))
+        void setAuto($, held => ({ ...held, isOn: !held.isOn }))
       },
       onCapDown: () => {
-        void update($, auto, held => ({ ...held, cap: Math.max(1, held.cap - 1) }))
+        void setAuto($, held => ({ ...held, cap: Math.max(1, held.cap - 1) }))
       },
       onCapUp: () => {
-        void update($, auto, held => ({ ...held, cap: Math.min(MAX_CAP, held.cap + 1) }))
+        void setAuto($, held => ({ ...held, cap: Math.min(MAX_CAP, held.cap + 1) }))
       },
       onPing: async () => {
         lastAction = (await ping($, false)).text

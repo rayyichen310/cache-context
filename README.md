@@ -63,7 +63,7 @@ The panel, with the context section and its legend open above the cache panel:
 
 - **Sends**: a refresh is a request to the same model over your conversation's existing prefix, made through Claude Code (`$.model.fork`). It goes where your messages already go and nowhere else. It is sent only when you press "Refresh now", run `/cache-ping`, or have turned auto-refresh on. **Refreshes use your plan's usage or your API credit**, a little each: the cached prefix at the read price plus a few dozen tokens. A compaction is sent only when you press the compact button.
 - **Reads**: the token usage of each main-conversation response; the session's context usage by category; the text of each main-conversation reply as it passes, only to count its Chinese and Latin letters; the environment variables `FORCE_PROMPT_CACHING_5M`, `CLAUDE_CODE_PROMPT_CACHE_TTL`, `ENABLE_PROMPT_CACHING_1H`, `LANG`, `LC_ALL`, and `USERPROFILE` or `HOME`; and your plan's rate-limit usage, to tell which lifetime applies. Of your files it only checks that a custom agent's file exists, to offer opening it. It does not read your settings files, your saved transcript or any credential.
-- **Stores**, in the plugin's own local store: up to 100 records of cache activity (time, token counts, model, hit or miss), whether a refresh has been seen to extend the cache, the language Claude last replied in, and a language you set yourself. No message text is stored.
+- **Stores**, in the plugin's own local store: up to 100 records of cache activity (time, token counts, model, hit or miss), whether a refresh has been seen to extend the cache, the auto-refresh switch and its limit, the language Claude last replied in, and a language you set yourself. No message text is stored.
 - No network requests of its own, no telemetry, no dependencies. The only command it runs opens a memory file or custom agent in your default app when you press its ↗.
 
 ## What each hook does
@@ -72,7 +72,7 @@ The mod registers these hooks. None of them changes what Claude is sent or what 
 
 | Hook | What it does | What it changes |
 | :- | :- | :- |
-| `session.start` | Starts a one-second timer that redraws the countdown and sends a refresh when one is due, registers the five commands, and measures the context window | Nothing: the event is passed on as it came |
+| `session.start` | Starts a one-second timer that redraws the countdown and sends a refresh when one is due, restores the auto-refresh setting you last chose, registers the five commands, and measures the context window | Nothing: the event is passed on as it came |
 | `session.measure` | Measures the context window again whenever Claude Code does | Nothing: the event is passed on as it came |
 | `turn.step` | For the main conversation only, reads the finished step's token usage and counts the letters of its reply | Nothing: every chunk and the result are passed on untouched |
 | `classic.SessionStart` | On resume or fork, takes the time since the last response, the context size, the model and whether Claude Code counts the cache as expired, so the cache's state shows before the first turn; after compaction, forgets the old cache | Nothing: it adds no context and passes the event on |
@@ -84,7 +84,7 @@ The mod registers these hooks. None of them changes what Claude is sent or what 
 ## Requirements and limits
 
 - Claude Code **v2.1.287 or later**: this plugin is a [mod](https://code.claude.com/docs/en/plugins/mods/overview). The mods API is new and may change.
-- Auto-refresh is per session and starts off. Until the mod has seen a refresh actually extend the cache, it sends one refresh per idle period and no more.
+- Auto-refresh starts off. Once you turn it on, the setting and its limit are kept in the plugin's store, so a restart or an update of Claude Code leaves it on, and it applies to every session until you turn it off. Until the mod has seen a refresh actually extend the cache, it sends one refresh per idle period and no more.
 - Only the main conversation is tracked. Subagents keep caches of their own.
 - After compaction the mod starts tracking afresh, and after a model switch it shows the cache as unavailable: what was cached no longer matches.
 - The context section's own words exist in Traditional Chinese, Simplified Chinese and English; other languages show the English.
@@ -138,7 +138,7 @@ Each language is one file under `hooks/locales/` plus an entry in the registry i
 
 - **輸入框上方的狀態列**：隨時間變短的圓環和倒數。
 - **面板**（`/cache-panel` 或狀態列上的「詳情 ›」）：倒數、已快取的 token 數、過期重建與續期一次的成本對比、損益平衡點、自動續期開關與次數上限、「立即續期」按鈕和最近幾次請求的快取命中情況。
-- **自動續期**預設關閉，以工作階段為單位。開啟後會在快取快過期時送一次續期請求，次數不超過你設的上限；已知模型價格時，總成本也不會超過一次過期多花的錢。確認續期有效之前，每段閒置期間只續期 1 次。
+- **自動續期**預設關閉。開啟後，開關和次數上限存在外掛自己的儲存區，Claude Code 重開或更新後仍保持開啟，並套用到之後所有工作階段，直到你關掉。開啟後會在快取快過期時送一次續期請求，次數不超過你設的上限；已知模型價格時，總成本也不會超過一次過期多花的錢。確認續期有效之前，每段閒置期間只續期 1 次。
 - 支援 43 種語言（和 Claude 桌面 app 一致），預設跟隨對話語言；也可以用 `/cache-lang` 加語言代碼手動設定。中英文以外的譯文是機器翻譯，沒有母語者校對，歡迎指正。
 - 續期請求透過 Claude Code 送到目前的模型，內容是現有對話的前綴；除此之外不發任何網路請求，也沒有遙測。只在每則回覆經過時統計中英文字元來判斷語言，不儲存回覆內容，也不讀取設定檔、對話紀錄或任何憑證。
 
