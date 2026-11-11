@@ -4,7 +4,18 @@ A Claude Code mod that shows when your conversation's prompt cache expires and w
 
 Claude Code reuses the cached part of your conversation at a fraction of the input price. The cache entry lives for five minutes or one hour after it was last used. Come back after that and your next message writes the conversation to the cache again, at 1.25 to 2 times the normal input price. This mod puts that clock where you can see it and does the arithmetic for you.
 
-It is a fork of [olddonkey/cache-refresher](https://github.com/olddonkey/cache-refresher) 0.2.4 that also shows how full the context window is: see [What this fork adds](#what-this-fork-adds).
+It is a fork of [olddonkey/cache-refresher](https://github.com/olddonkey/cache-refresher) 0.2.4. The fork adds:
+
+- How full the context window is: a ring on the status bar, and a context section in the panel
+- A compact button on the status bar and in the panel
+- A usage guard: near the five-hour limit Claude wraps up, the session pauses, and it continues after the reset
+- Two toggles on the status bar, for auto-refresh and the usage guard
+- The auto-refresh switch kept across restarts
+- A refresh refused at the usage limit waits for the reset instead of trying again every second
+
+![The status bar above the prompt: the cache countdown, the context fill, compact, and the two toggles](docs/band.png)
+
+The details are under [What this fork adds](#what-this-fork-adds).
 
 [中文說明](#中文說明)
 
@@ -51,15 +62,16 @@ With Claude Code 2.1.295 in the desktop app, the usage popover in my local sessi
 
 The figures are the ones `/context` shows, read locally after each main-conversation turn; no request is sent for them.
 
+It also adds:
+
 - **A usage guard**, off until you turn it on in the panel. When the five-hour usage reaches the threshold (97% unless you change it, 50–99%) after one of Claude's replies, each tool result carries a note only Claude reads, asking it to finish the step in hand, write down its progress and the next step, and stop. After 8 more tools, or at 99%, tools are refused; the third refused call ends the turn. Once the turn ends the session is paused. With the guard's "Continue after the reset" switch on (the default), the mod sends a continue prompt 30 seconds after the five-hour reset; if that is refused, it tries again after 5 seconds, then each minute, five times at most. Auto-refresh keeps the cache alive through the pause as usual. Your own message ends the pause. With the seven-day usage used up there is no automatic continue. The panel shows the five-hour usage, the threshold, the continue switch, and while wrapping up or paused, Stop now, Not this time, Continue now and Cancel continue. The continue switch is the mod's own and does not change Claude Code's "Continue automatically at usage limit" (`autoContinueAtUsageLimit`): Claude Code lets a mod turn that setting off but not on.
+- **Two toggles on the status bar**, after the compact button: Refresh for auto-refresh and Guard for the usage guard. A dot before each is green when it is on, grey when it is off, and amber while it is at work. A press turns it on or off, as the panel's switch does, and both stay while Claude is replying. While the guard wraps up or pauses, its toggle says so (`Guard · wrapping up 97%`, `Guard · continues 18:30`, `Guard · paused`), and a press opens the panel instead of turning the guard off. While a refresh waits for the usage limit to reset, the Refresh toggle shows the reset time. The status bar stays on one line: when it is narrow, only the context figures are cut short.
+- **The auto-refresh switch is kept** in the mod's own store, so it stays on across restarts and updates of Claude Code and holds for later sessions until you turn it off.
+- **A refresh refused at the usage limit** is not tried again before the reset and does not count against the limit you set; with no reset time given, the cache is not refreshed again until the next reply. Any other failed refresh counts as one, and the next comes at least a minute later.
 
-The status bar, with the cache countdown, the context fill and the compact button:
+The panel: the context section above the cache countdown, then auto-refresh and the usage guard:
 
-![The band above the prompt](docs/band.png)
-
-The panel, with the context section and its legend open above the cache panel:
-
-![The panel with the legend open](docs/panel.png)
+![The panel](docs/panel.png)
 
 ## What it reads, stores and sends
 
@@ -148,6 +160,17 @@ Each language is one file under `hooks/locales/` plus an entry in the registry i
 
 一個 Claude Code mod：顯示目前對話的提示快取還有多久過期、過期後重建大約要花多少錢。還可以在你離開時自動續期：這個功能預設關閉，每次續期會用掉少量方案額度或產生 API 費用。
 
+從 [olddonkey/cache-refresher](https://github.com/olddonkey/cache-refresher) 0.2.4 改來，這個分支多了：
+
+- 上下文視窗用量：狀態列上的圓圈，以及面板裡的上下文區塊
+- 狀態列和面板上的壓縮按鈕
+- 用量保護：五小時用量快滿時讓 Claude 收尾、暫停，重置後自動繼續
+- 狀態列上的兩個快速開關：自動續期和用量保護
+- 自動續期開關在重開後保留
+- 續期遇到用量上限時等重置，不再每秒重試
+
+截圖見上方 [What this fork adds](#what-this-fork-adds)（介面語言為英文）。
+
 - **輸入框上方的狀態列**：隨時間變短的圓環和倒數。
 - **面板**（`/cache-panel` 或狀態列上的「詳情 ›」）：倒數、已快取的 token 數、過期重建與續期一次的成本對比、損益平衡點、自動續期開關與次數上限、「立即續期」按鈕和最近幾次請求的快取命中情況。
 - **自動續期**預設關閉。開啟後，開關和次數上限存在外掛自己的儲存區，Claude Code 重開或更新後仍保持開啟，並套用到之後所有工作階段，直到你關掉。開啟後會在快取快過期時送一次續期請求，次數不超過你設的上限；已知模型價格時，總成本也不會超過一次過期多花的錢。確認續期有效之前，每段閒置期間只續期 1 次。續期遇到用量上限被拒時，會等額度重置再續，這次不算進上限；其他原因失敗算一次，下一次至少隔 1 分鐘。
@@ -156,13 +179,12 @@ Each language is one file under `hooks/locales/` plus an entry in the registry i
 - 續期請求透過 Claude Code 送到目前的模型，內容是現有對話的前綴；除此之外不發任何網路請求，也沒有遙測。只在每則回覆經過時統計中英文字元來判斷語言，不儲存回覆內容，也不讀取設定檔、對話紀錄或任何憑證。
 - **與閒置壓縮（idle compaction）的關係**：使用 1 小時快取且上下文達到 20 萬 token（由 `CLAUDE_CODE_IDLE_COMPACT_MIN_TOKENS` 設定，最低 10 萬）時，Claude Code 會在快取壽命的 90%，也就是最後一輪結束後第 54 分鐘，把閒置的對話壓縮成摘要。自動續期要等到過期前 5 分鐘（第 55 分鐘）才送出，續期也不會延後壓縮，所以只要有工作階段開著自動續期，外掛就會關閉閒置壓縮（`/config` 裡的 Idle compaction，寫入你的使用者設定），等最後一個工作階段關掉自動續期或結束時再恢復；當掉或被強制結束的工作階段，5 分鐘沒有動靜後視為已結束。只恢復外掛自己關掉的；開啟自動續期時本來就關著的不會被打開。如果在外掛關著這項設定時停用或移除外掛，請到 `/config` 手動打開。如果這項設定由專案、本機或受管設定檔決定，外掛改不了，請在那裡設定 `"idleCompaction": false`，或把 `CLAUDE_CODE_IDLE_COMPACT_MIN_TOKENS` 調到高於你的上下文大小。
 
-**這個分支多了什麼**：從 [olddonkey/cache-refresher](https://github.com/olddonkey/cache-refresher) 0.2.4 改來。桌面 app 搭配 Claude Code 2.1.295 時，本機 session 的用量彈窗不再顯示上下文視窗，所以加回來放在快取倒數旁邊：
+**上下文視窗與快速開關**：桌面 app 搭配 Claude Code 2.1.295 時，本機 session 的用量彈窗不再顯示上下文視窗，所以加回來放在快取倒數旁邊：
 
 - 狀態列多一個上下文用量的圈，例如「上下文 182.6k/350k (52%)」；快取的 token 數、重建成本和續期次數移到面板裡。
 - 狀態列和面板都有壓縮按鈕，效果和 `/compact` 一樣，Claude 回應中會先藏起來。
 - 面板最上方是仿桌面 app 的「背景資訊」：依類別分段的用量條、距自動壓縮剩多少、各類別的 token 數和佔比，以及 MCP 工具、記憶檔案、自訂代理清單；按 ↗ 會用預設程式打開該檔案。這是唯一會執行的指令。
-
-截圖見上方 [What this fork adds](#what-this-fork-adds)（介面語言為英文）。
+- 狀態列的壓縮按鈕後面有「續期」「保護」兩個開關，按鈕前的圓點綠色是開、灰色是關、橘色是正在動作。按一下切換開關，效果和面板上的開關相同；Claude 回應中也會顯示。用量保護收尾或暫停時，按鈕會寫出狀態（`保護 · 收尾中 97%`、`保護 · 18:30 繼續`、`保護 · 已暫停`），這時按下會打開面板，不會關掉保護。續期在等用量上限重置時，「續期」按鈕會顯示重置時間。狀態列固定一行，寬度不夠時只截短上下文的數字。
 
 需要 Claude Code v2.1.287 及以上。安裝方式見上方 [Install](#install)；如果也裝了原版 cache-refresher，請把原版停用。
 
