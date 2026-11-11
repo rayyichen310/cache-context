@@ -1,6 +1,7 @@
 import { expect, mock, test } from 'claude-code/testing'
 
 import { economics, fmtRemaining, priceOf } from '../hooks/economics'
+import { fmtClock } from '../hooks/limits'
 import { resumedTtl } from '../hooks/model'
 
 const MINUTE = 60_000
@@ -223,7 +224,8 @@ test('the band draws the countdown on the terminal and the desktop', { timeoutMs
     expect((await ui.find({ type: 'Text', text: '52m' }))?.props.bold).toBe(true)
     expect(await ui.find({ type: 'Text', text: /expires/ })).toBeUndefined()
     expect(await ui.find({ key: 'details' })).toBeDefined()
-    expect((await ui.find({ type: 'Text', text: '●' })) !== undefined).toBe(surface === 'terminal')
+    // Both surfaces draw the two quick toggles' dots; only the terminal adds one for the cache.
+    expect(await ui.findAll({ type: 'Text', text: '●' })).toHaveLength(surface === 'terminal' ? 3 : 2)
     // The desktop draws the lifetime left as a small ring; the terminal marks it with a dot.
     const drawings = await ui.findAll({ type: 'Svg' })
     expect(drawings).toHaveLength(surface === 'desktop' ? 1 : 0)
@@ -512,6 +514,7 @@ test('a refresh refused at the usage limit is not retried before the limit reset
 
     return forkRateLimited()
   })
+  on('ui.render', { component: 'AbovePrompt' }, (inner, e) => inner.ui.resolve(e).Box({}))
   await idleAfterOneTurn($, on)
 
   await clock.advance(54 * MINUTE)
@@ -521,6 +524,12 @@ test('a refresh refused at the usage limit is not retried before the limit reset
   expect(forks).toBe(1)
   expect(logged).toHaveLength(1)
   expect(toasted).toHaveLength(0)
+
+  // The band's refresh toggle turns amber and names the reset it waits for.
+  const props = { hasSurvey: false, isWorking: false, maxRows: 10, bodyColumns: 120, scroll: { offset: 0, bodyRows: 10 }, view: {} }
+  const band = await $.ui.mount({ plugin: 'cache-context', surface: 'desktop', component: 'AbovePrompt', props })
+  expect((await band.find({ key: 'quick-refresh' }))?.text).toContain(`Refresh ${fmtClock(START + 180 * MINUTE)}`)
+  expect((await band.findAll({ type: 'Text', text: '●' }))[0]?.props.color).toBe('warning')
 })
 
 test('a refresh refused at the usage limit resumes once the limit resets before the cache ends', { timeoutMs: 30_000 }, async ($, on) => {

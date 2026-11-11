@@ -48,7 +48,6 @@ export type LimitWords = {
   resets: (time: string) => string
   threshold: string
   autoContinue: string
-  autoContinueNote: string
   wrapping: string
   wrappingLeft: (tools: number) => string
   blocking: string
@@ -65,10 +64,12 @@ export type LimitWords = {
   btnCancelResume: string
   limitResume: (time: string) => string
   limitRebuild: (expiry: string) => string
-  bandWrapping: (percent: string) => string
-  bandPausedAuto: (time: string) => string
-  bandPausedManual: (time: string) => string
-  bandLimitExpiry: (time: string) => string
+  quickRefresh: string
+  quickRefreshHeld: (time: string) => string
+  quickGuard: string
+  quickWrapping: (percent: string) => string
+  quickContinues: (time: string) => string
+  quickPaused: string
   denied: string
   resumePrompt: string
 }
@@ -83,7 +84,6 @@ const EN: LimitWords = {
   resets: time => `resets ${time}`,
   threshold: 'Wrap up at',
   autoContinue: 'Continue after the reset',
-  autoContinueNote: 'This switch is the mod\'s own, apart from "Continue automatically at usage limit" in /config.',
   wrapping: 'Wrapping up: Claude was asked to save its progress and stop',
   wrappingLeft: tools => `${tools} more tool uses, then stopped (or at 99%)`,
   blocking: 'Wrapping up: tools are refused until Claude writes down its progress',
@@ -100,10 +100,12 @@ const EN: LimitWords = {
   btnCancelResume: 'Cancel continue',
   limitResume: time => `Usage limit reached · refreshing resumes after the reset at ${time}`,
   limitRebuild: expiry => `Usage limit reached · the cache expires at ${expiry} and is rebuilt after the reset`,
-  bandWrapping: percent => `· usage ${percent}%, wrapping up`,
-  bandPausedAuto: time => `Paused · continues at ${time} · cache`,
-  bandPausedManual: time => `Paused · usage resets at ${time}; continue by hand`,
-  bandLimitExpiry: time => `Usage limit reached · cache expires at ${time}`,
+  quickRefresh: 'Refresh',
+  quickRefreshHeld: time => `Refresh ${time}`,
+  quickGuard: 'Guard',
+  quickWrapping: percent => `Wrapping up ${percent}%`,
+  quickContinues: time => `Continues ${time}`,
+  quickPaused: 'Paused',
   denied: 'The five-hour usage limit is nearly reached, so tools are paused. Write down the progress so far and the next step, then end your turn.',
   resumePrompt: 'The five-hour usage limit has reset. Continue from where you paused.',
 }
@@ -118,7 +120,6 @@ const ZH_HANT: LimitWords = {
   resets: time => `${time} 重置`,
   threshold: '到這個用量時收尾',
   autoContinue: '重置後自動繼續',
-  autoContinueNote: '這是本外掛自己的開關，和 /config 的「Continue automatically at usage limit」分開。',
   wrapping: '收尾中：已提醒 Claude 存好進度後停下',
   wrappingLeft: tools => `還能用 ${tools} 次工具，用完或到 99% 就強制停止`,
   blocking: '收尾中：已擋下工具，等 Claude 寫下進度後停止',
@@ -135,10 +136,12 @@ const ZH_HANT: LimitWords = {
   btnCancelResume: '取消自動繼續',
   limitResume: time => `已達上限 · ${time} 重置後恢復續期`,
   limitRebuild: expiry => `已達上限 · 快取 ${expiry} 過期，重置後重建`,
-  bandWrapping: percent => `· 用量 ${percent}%，收尾中`,
-  bandPausedAuto: time => `已暫停 · ${time} 自動繼續 · 快取`,
-  bandPausedManual: time => `已暫停 · ${time} 額度重置，需要手動繼續`,
-  bandLimitExpiry: time => `已達上限 · 快取 ${time} 過期`,
+  quickRefresh: '續期',
+  quickRefreshHeld: time => `續期 ${time}`,
+  quickGuard: '保護',
+  quickWrapping: percent => `收尾中 ${percent}%`,
+  quickContinues: time => `${time} 繼續`,
+  quickPaused: '已暫停',
   denied: '五小時用量快滿，工具已暫停使用。請直接寫下目前進度和下一步，然後結束這一輪。',
   resumePrompt: '五小時用量已重置。請從暫停前的進度繼續。',
 }

@@ -39,9 +39,17 @@ async function guarded($: any, on: any, setup: Setup = {}) {
   mounted = undefined
   const clock = mock.clock(on, { now: START })
   const settings = { ...GUARD_ON.usageGuard, autoContinue: setup.autoContinue ?? true }
-  mock.store(on, { usageGuard: settings, ...setup.store })
+  const kept = new Map<string, unknown>(Object.entries({ usageGuard: settings, ...setup.store }))
+  on('store.get', (_: unknown, e: { key: string }) => ({ value: kept.get(e.key) }))
+  on('store.set', (_: unknown, e: { key: string; value: unknown }) => {
+    kept.set(e.key, e.value)
+
+    return { value: undefined }
+  })
   mock.env(on, { CLAUDE_CODE_PROMPT_CACHE_TTL: '1h' })
   const world = {
+    kept,
+    opened: [] as string[],
     percent: setup.percent ?? 50,
     weekly: setup.weekly ?? 10,
     // Claude Code's own setting, which a mod may turn off but not on: the guard must not touch it.
@@ -98,6 +106,11 @@ async function guarded($: any, on: any, setup: Setup = {}) {
   on('command.register', (_: unknown, e: { name: string }) => ({ value: { command: e.name } }))
   on('ui.invalidate', () => ({ value: undefined }))
   on('ui.panes', () => ({ value: [] }))
+  on('ui.open', (_: unknown, e: { id: string }) => {
+    world.opened.push(e.id)
+
+    return { value: { isPlaced: true } }
+  })
   on('ui.toast', () => ({ value: undefined }))
   on('ui.log', () => ({ value: undefined }))
   await $.session.start({ cwd: '/tmp', surface: 'terminal', isInteractive: true })
@@ -349,12 +362,9 @@ test('the panel shows the usage and sets the threshold', async ($, on) => {
 test('the continue switch turns off and back on, apart from Claude Code\'s own setting', async ($, on) => {
   const { clock, world } = await pausedSession($, on)
   const ui = await pane($)
-  expect(await ui.find({ type: 'Text', text: 'This switch is the mod\'s own, apart from "Continue automatically at usage limit" in /config.' })).toBeUndefined()
-
   await ui.press({ key: 'guard-cancel' })
   await ui.press({ key: 'guard-toggle' })
   await ui.press({ key: 'guard-toggle' })
-  expect(await ui.find({ type: 'Text', text: 'This switch is the mod\'s own, apart from "Continue automatically at usage limit" in /config.' })).toBeDefined()
   await ui.press({ key: 'guard-continue' })
   expect((await ui.find({ key: 'guard-continue' }))?.text).toContain('Turn on')
   await ui.press({ key: 'guard-continue' })
@@ -368,13 +378,68 @@ test('the continue switch turns off and back on, apart from Claude Code\'s own s
   expect(world.submitted).toHaveLength(1)
 })
 
-test('the band says the session is wrapping up, then paused until the continue', async ($, on) => {
-  const { world } = await guarded($, on, { percent: 97 })
+const BAND_PROPS = { hasSurvey: false, isWorking: false, maxRows: 10, bodyColumns: 120, scroll: { offset: 0, bodyRows: 10 }, view: {} }
+
+// The band on the desktop, where the only dots are the two toggles': refresh first, then the guard.
+async function band($: any, isWorking = false) {
+  const ui = await $.ui.mount({ plugin: 'cache-context', surface: 'desktop', component: 'AbovePrompt', props: { ...BAND_PROPS, isWorking } })
+  const dots = await ui.findAll({ type: 'Text', text: '●' })
+
+  return { ui, refresh: dots[0]?.props.color, guard: dots[1]?.props.color }
+}
+
+test('the band holds both toggles, and keeps them while Claude works', async ($, on) => {
+  await guarded($, on, { percent: 42 })
   await turnWithReply($)
-  const props = { hasSurvey: false, isWorking: false, maxRows: 10, bodyColumns: 120, scroll: { offset: 0, bodyRows: 10 }, view: {} }
-  const band = () => $.ui.mount({ plugin: 'cache-context', surface: 'terminal', component: 'AbovePrompt', props })
-  expect(await (await band()).find({ type: 'Text', text: '· usage 97%, wrapping up' })).toBeDefined()
+  for (const isWorking of [false, true]) {
+    const { ui, refresh, guard } = await band($, isWorking)
+    expect((await ui.find({ key: 'quick-refresh' }))?.text).toContain('Refresh')
+    expect((await ui.find({ key: 'quick-guard' }))?.text).toContain('Guard')
+    expect(refresh).toBe('inactive')
+    expect(guard).toBe('success')
+    expect((await ui.find({ key: 'compact' })) !== undefined).toBe(!isWorking)
+  }
+})
+
+test('the band\'s toggles turn auto-refresh and the guard on and off, and keep the choice', async ($, on) => {
+  const { world } = await guarded($, on, { percent: 42 })
+  await turnWithReply($)
+  await (await band($)).ui.press({ key: 'quick-refresh' })
+  expect((await band($)).refresh).toBe('success')
+  expect(world.kept.get('auto')).toMatchObject({ isOn: true })
+  await (await band($)).ui.press({ key: 'quick-refresh' })
+  expect((await band($)).refresh).toBe('inactive')
+  expect(world.kept.get('auto')).toMatchObject({ isOn: false })
+
+  await (await band($)).ui.press({ key: 'quick-guard' })
+  expect((await band($)).guard).toBe('inactive')
+  expect(world.kept.get('usageGuard')).toMatchObject({ isOn: false })
+  await (await band($)).ui.press({ key: 'quick-guard' })
+  expect((await band($)).guard).toBe('success')
+  expect(world.kept.get('usageGuard')).toMatchObject({ isOn: true })
+})
+
+test('while wrapping up or paused the guard toggle says so, and a press opens the panel and leaves the guard on', async ($, on) => {
+  const { world } = await guarded($, on, { percent: 97 })
+  const { opened } = world
+  await turnWithReply($)
+  let now = await band($)
+  expect((await now.ui.find({ key: 'quick-guard' }))?.text).toContain('Wrapping up 97%')
+  expect(now.guard).toBe('warning')
+  // The usage is no longer spelled out beside the countdown.
+  expect(await now.ui.find({ type: 'Text', text: /usage 97%/ })).toBeUndefined()
+  await now.ui.press({ key: 'quick-guard' })
+  expect(opened).toEqual(['cache'])
+
   await endTurn($, 't1')
-  expect(await (await band()).find({ type: 'Text', text: `Paused · continues at ${fmtClock(RESUME)} · cache` })).toBeDefined()
-  void world
+  now = await band($)
+  expect((await now.ui.find({ key: 'quick-guard' }))?.text).toContain(`Continues ${fmtClock(RESUME)}`)
+  expect(await now.ui.find({ type: 'Text', text: /Paused/ })).toBeUndefined()
+  await now.ui.press({ key: 'quick-guard' })
+  expect(opened).toEqual(['cache', 'cache'])
+  expect(world.kept.get('usageGuard')).toMatchObject({ isOn: true })
+
+  // With no continue planned it reads as paused.
+  await (await pane($)).press({ key: 'guard-cancel' })
+  expect((await (await band($)).ui.find({ key: 'quick-guard' }))?.text).toContain('Paused')
 })

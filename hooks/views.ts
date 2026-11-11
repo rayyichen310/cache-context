@@ -84,6 +84,13 @@ export type PaneHandlers = {
 /** The usage guard as a draw needs it: its settings and where it stands. */
 export type GuardView = { settings: Guard; run: GuardRun }
 
+/** The band's quick toggles: the auto-refresh switch and the usage guard, with what a press on each does. */
+export type QuickPart = GuardView & {
+  isAutoOn: boolean
+  onAuto: () => void
+  onGuard: () => void
+}
+
 /** The usage guard with the panel's controls for it. */
 export type GuardPart = GuardView & {
   onToggle: () => void
@@ -105,11 +112,11 @@ function cacheEndOf(held: Snapshot | null, now: number): number | null {
 }
 
 /** A refresh refused at the usage limit: refreshing resumes after the reset, or the cache ends before it. */
-function limitLine(w: LimitWords, reset: number | null, cacheEnd: number | null, isBand: boolean): string {
+function limitLine(w: LimitWords, reset: number | null, cacheEnd: number | null): string {
   if (reset === null) return w.heldNoReset
   if (cacheEnd === null || cacheEnd > reset) return w.limitResume(fmtClock(reset))
 
-  return isBand ? w.bandLimitExpiry(fmtClock(cacheEnd)) : w.limitRebuild(fmtClock(cacheEnd))
+  return w.limitRebuild(fmtClock(cacheEnd))
 }
 
 /** A pause with no continue planned: why, and when the usage comes back. */
@@ -121,18 +128,29 @@ function pausedLine(w: LimitWords, run: GuardRun): string {
 
 const fmtPercent = (percent: number | null) => (percent === null ? '?' : String(Math.floor(percent)))
 
-/** The guard's words in the band: before the cache's ring while paused or at the limit, after its countdown while wrapping up. */
-function guardBand(w: LimitWords, g: GuardView | null, held: Snapshot | null, now: number): { before: string | null; after: string | null } {
-  if (g === null) return { before: null, after: null }
-  const { settings, run } = g
-  if (settings.isOn && (run.phase === 'wrapping' || run.phase === 'blocking')) return { before: null, after: w.bandWrapping(fmtPercent(run.percent)) }
-  if (settings.isOn && run.phase === 'paused') {
-    return { before: run.resumeAt !== null ? w.bandPausedAuto(fmtClock(run.resumeAt)) : pausedLine(w, run), after: null }
-  }
-  if (settings.isOn && run.phase === 'resumeFailed') return { before: w.resumeFailed, after: null }
-  if (run.limit !== null) return { before: limitLine(w, run.limit.reset, cacheEndOf(held, now), true), after: null }
+// A quick toggle's dot: on, off, or at work (wrapping up, paused, held at the usage limit).
+const LAMP_COLOR = { on: 'success', off: 'inactive', busy: 'warning' } as const
 
-  return { before: null, after: null }
+type Lamp = { lamp: keyof typeof LAMP_COLOR; label: string }
+
+/** The auto-refresh toggle: on or off, and the reset it waits for while held at the usage limit. */
+function refreshLamp(w: LimitWords, q: QuickPart): Lamp {
+  if (!q.isAutoOn) return { lamp: 'off', label: w.quickRefresh }
+  const { limit } = q.run
+  if (limit === null) return { lamp: 'on', label: w.quickRefresh }
+
+  return { lamp: 'busy', label: limit.reset === null ? w.quickRefresh : w.quickRefreshHeld(fmtClock(limit.reset)) }
+}
+
+/** The usage guard's toggle: on or off, or what it is doing, which a press opens the panel for. */
+function guardLamp(w: LimitWords, q: QuickPart): Lamp & { isBusy: boolean } {
+  const { settings, run } = q
+  if (!settings.isOn) return { lamp: 'off', label: w.quickGuard, isBusy: false }
+  if (run.phase === 'wrapping' || run.phase === 'blocking') return { lamp: 'busy', label: w.quickWrapping(fmtPercent(run.percent)), isBusy: true }
+  if (run.phase === 'paused' && run.resumeAt !== null) return { lamp: 'busy', label: w.quickContinues(fmtClock(run.resumeAt)), isBusy: true }
+  if (run.phase === 'paused' || run.phase === 'resumeFailed') return { lamp: 'busy', label: w.quickPaused, isBusy: true }
+
+  return { lamp: 'on', label: w.quickGuard, isBusy: false }
 }
 
 /** The five-hour usage as a thin bar, with a tick where wrapping up begins. */
@@ -431,7 +449,7 @@ export function bandView(
   motion: Motion,
   onDetails: () => void,
   ctx: ContextPart,
-  guardView: GuardView | null = null,
+  quick: QuickPart | null = null,
 ): RenderElement {
   const { Box, Text, Button } = els
   const Svg = svgOf(els, surface)
@@ -439,8 +457,6 @@ export function bandView(
   const children: RenderNode[] = []
 
   const { held, now, policy, known } = view
-  const guarded = guardBand(limitWords(m.tag), guardView, held, now)
-  if (guarded.before !== null) children.push(Text({ color: 'warning', children: [guarded.before] }))
   if (isTracked(held)) {
     const remaining = remainingOf(held, now)
     const head = remaining > 0 ? fmtRemaining(remaining) : held.coldReason === null ? m.bandCold : m.bandUnusable
@@ -454,11 +470,9 @@ export function bandView(
       Svg
         ? Box({ flexShrink: 0, children: [Svg({ alt: head, width: 18, height: 18, source: ringSvg('band', held, isSaved, motion, null, m) })] })
         : Text({ color: remaining > 0 ? EMBER : SLATE, children: [remaining > 0 ? '●' : '○'] }),
-      Text({ bold: true, ...emphasis, children: [head] }),
+      Box({ flexShrink: 0, children: [Text({ bold: true, ...emphasis, children: [head] })] }),
     )
   }
-  if (guarded.after !== null) children.push(Text({ color: 'warning', children: [guarded.after] }))
-
   const meter = ctx.meter
   if (meter !== null) {
     const percent = percentOf(meter)
@@ -470,16 +484,28 @@ export function bandView(
       Text({ dimColor: true, wrap: 'truncate-end', children: [fill] }),
     )
     const control = compactControl(els, w, ctx)
-    if (control !== null) children.push(control)
+    if (control !== null) children.push(Box({ flexShrink: 0, children: [control] }))
+  }
+
+  // The switches stay while Claude works, so either can be turned off mid-turn. Only the context's words give way to a narrow band.
+  if (quick !== null) {
+    const lw = limitWords(m.tag)
+    const toggle = (key: string, { lamp, label }: Lamp, onPress: () => void) =>
+      Box({ flexShrink: 0, children: [Button({ key, label, variant: 'secondary', onPress, children: [Text({ color: LAMP_COLOR[lamp], children: ['●'] }), ` ${label}`] })] })
+    const guarding = guardLamp(lw, quick)
+    children.push(
+      toggle('quick-refresh', refreshLamp(lw, quick), quick.onAuto),
+      toggle('quick-guard', guarding, guarding.isBusy ? onDetails : quick.onGuard),
+    )
   }
 
   // The way into the panel sits at the band's far edge.
   children.push(
     Box({ flexGrow: 1, children: [] }),
-    Button({ key: 'details', label: m.details, plain: true, dimColor: true, onPress: onDetails }),
+    Box({ flexShrink: 0, children: [Button({ key: 'details', label: m.details, plain: true, dimColor: true, onPress: onDetails })] }),
   )
 
-  return Box({ flexDirection: 'row', columnGap: 1, alignItems: 'center', width: '100%', children })
+  return Box({ flexDirection: 'row', flexWrap: 'nowrap', columnGap: 1, alignItems: 'center', width: '100%', children })
 }
 
 /**
@@ -933,7 +959,6 @@ export function paneView(
           words(w.autoContinue, 'body'),
           Button({ key: 'guard-continue', label: settings.autoContinue ? w.btnOff : w.btnOn, variant: 'secondary', onPress: guardPart.onAutoContinue }),
         ]),
-        dim(w.autoContinueNote),
       )
     } else if (settings.isOn && (run.phase === 'wrapping' || run.phase === 'blocking')) {
       guardRows.push(dim(run.phase === 'wrapping' ? w.wrapping : w.blocking))
@@ -958,7 +983,7 @@ export function paneView(
     } else if (settings.isOn && run.phase === 'resumeFailed') {
       guardRows.push(dim(w.resumeFailed), buttons([Button({ key: 'guard-resume', label: w.btnResume, variant: 'primary', onPress: guardPart.onResume })]))
     }
-    if (run.limit !== null) guardRows.push(dim(limitLine(w, run.limit.reset, cacheEndOf(held, now), false)))
+    if (run.limit !== null) guardRows.push(dim(limitLine(w, run.limit.reset, cacheEndOf(held, now))))
   }
 
   if (!Svg) {

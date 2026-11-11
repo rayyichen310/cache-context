@@ -617,6 +617,22 @@ async function contextPartOf($: EngineInterface, tag: string, isWorking: boolean
 }
 
 /** Opens the panel, noting when. */
+/** Turns auto-refresh on or off, from the panel or the band, telling the person when idle compaction moved with it. */
+async function toggleAuto($: EngineInterface): Promise<void> {
+  const idle = await setAuto($, held => ({ ...held, isOn: !held.isOn }))
+  if (idle !== null) $.ui.toast(idle)
+}
+
+/** Turns the usage guard on or off, from the panel or the band: off ends any pause, on reads the usage at once. */
+async function toggleGuard($: EngineInterface): Promise<void> {
+  const settings = await setGuard($, held => ({ ...held, isOn: !held.isOn }))
+  if (!settings.isOn) {
+    await endPause($)
+    return
+  }
+  await readUsage($)
+}
+
 async function openPane($: EngineInterface, title: string): Promise<void> {
   openedAt = await $.clock.now()
   await $.ui.open({ id: PANE, title, focus: true, closeOnEscape: true })
@@ -1061,7 +1077,13 @@ export const register: Register = on => {
     const els = $.ui.resolve(e)
     const band = bandView(els, e.surface, m, view, await motionOf($), () => {
       void openPane($, m.paneTitle)
-    }, await contextPartOf($, m.tag, e.props.isWorking), { settings: await read($, guard), run: await read($, guardRun) })
+    }, await contextPartOf($, m.tag, e.props.isWorking), {
+      settings: await read($, guard),
+      run: await read($, guardRun),
+      isAutoOn: (await read($, auto)).isOn,
+      onAuto: () => void toggleAuto($),
+      onGuard: () => void toggleGuard($),
+    })
 
     return els.Box({ flexDirection: 'column', children: [beneath, band] })
   })
@@ -1072,10 +1094,7 @@ export const register: Register = on => {
     const ctx = await contextPartOf($, m.tag, false)
 
     return paneView($.ui.resolve(e), e.surface, m, await viewOf($), lastAction, {
-      onToggle: async () => {
-        const idle = await setAuto($, held => ({ ...held, isOn: !held.isOn }))
-        if (idle !== null) $.ui.toast(idle)
-      },
+      onToggle: () => toggleAuto($),
       onCapDown: () => {
         void setAuto($, held => ({ ...held, cap: Math.max(1, held.cap - 1) }))
       },
@@ -1089,14 +1108,7 @@ export const register: Register = on => {
     }, e.props.bodyColumns, await motionOf($), ctx, {
       settings: await read($, guard),
       run: await read($, guardRun),
-      onToggle: async () => {
-        const settings = await setGuard($, held => ({ ...held, isOn: !held.isOn }))
-        if (!settings.isOn) {
-          await endPause($)
-          return
-        }
-        await readUsage($)
-      },
+      onToggle: () => toggleGuard($),
       onThresholdDown: () => {
         void setGuard($, held => ({ ...held, threshold: Math.max(MIN_THRESHOLD, held.threshold - 1) }))
       },
