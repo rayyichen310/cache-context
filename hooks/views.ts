@@ -129,9 +129,15 @@ function pausedLine(w: LimitWords, run: GuardRun): string {
 const fmtPercent = (percent: number | null) => (percent === null ? '?' : String(Math.floor(percent)))
 
 // A quick toggle's dot: on, off, or at work (wrapping up, paused, held at the usage limit).
+// The terminal colours it from the theme; the desktop draws it, as its native button shows the label alone.
 const LAMP_COLOR = { on: 'success', off: 'inactive', busy: 'warning' } as const
+const LAMP_FILL = { on: '#2E9E6A', off: '#8A8A85', busy: '#E0A030' } as const
 
 type Lamp = { lamp: keyof typeof LAMP_COLOR; label: string }
+
+function lampSvg(lamp: Lamp['lamp'], locale: DrawingLocale): string {
+  return `<svg xmlns="http://www.w3.org/2000/svg" lang="${locale.tag}" viewBox="0 0 10 10">${styleOf(locale.fonts)}<circle cx="5" cy="5" r="4" fill="${LAMP_FILL[lamp]}"/></svg>`
+}
 
 /** The auto-refresh toggle: on or off, and the reset it waits for while held at the usage limit. */
 function refreshLamp(w: LimitWords, q: QuickPart): Lamp {
@@ -490,8 +496,18 @@ export function bandView(
   // The switches stay while Claude works, so either can be turned off mid-turn. Only the context's words give way to a narrow band.
   if (quick !== null) {
     const lw = limitWords(m.tag)
+    // A button draws its label alone, so the dot stands just before it.
     const toggle = (key: string, { lamp, label }: Lamp, onPress: () => void) =>
-      Box({ flexShrink: 0, children: [Button({ key, label, variant: 'secondary', onPress, children: [Text({ color: LAMP_COLOR[lamp], children: ['●'] }), ` ${label}`] })] })
+      Box({
+        flexShrink: 0,
+        flexDirection: 'row',
+        alignItems: 'center',
+        columnGap: 1,
+        children: [
+          Svg ? Svg({ alt: lamp, width: 10, height: 10, source: lampSvg(lamp, m) }) : Text({ color: LAMP_COLOR[lamp], children: ['●'] }),
+          Button({ key, label, variant: 'secondary', onPress }),
+        ],
+      })
     const guarding = guardLamp(lw, quick)
     children.push(
       toggle('quick-refresh', refreshLamp(lw, quick), quick.onAuto),

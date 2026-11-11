@@ -868,7 +868,8 @@ for (const lang of LANGS) {
     })
     const bandDrawings = await band.findAll({ type: 'Svg' })
     const paneDrawings = await pane.findAll({ type: 'Svg' })
-    expect(bandDrawings).toHaveLength(1)
+    // The cache's ring and the two quick toggles' dots.
+    expect(bandDrawings).toHaveLength(3)
     // Splitting the card into ring, figure and costs adds two drawings; the usage guard's rule and title two more.
     expect(paneDrawings).toHaveLength(11)
     for (const drawing of [...bandDrawings, ...paneDrawings]) {

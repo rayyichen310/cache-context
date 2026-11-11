@@ -224,11 +224,11 @@ test('the band draws the countdown on the terminal and the desktop', { timeoutMs
     expect((await ui.find({ type: 'Text', text: '52m' }))?.props.bold).toBe(true)
     expect(await ui.find({ type: 'Text', text: /expires/ })).toBeUndefined()
     expect(await ui.find({ key: 'details' })).toBeDefined()
-    // Both surfaces draw the two quick toggles' dots; only the terminal adds one for the cache.
-    expect(await ui.findAll({ type: 'Text', text: '●' })).toHaveLength(surface === 'terminal' ? 3 : 2)
+    // The terminal marks the cache and the two quick toggles with dots; the desktop draws all three.
+    expect(await ui.findAll({ type: 'Text', text: '●' })).toHaveLength(surface === 'terminal' ? 3 : 0)
     // The desktop draws the lifetime left as a small ring; the terminal marks it with a dot.
     const drawings = await ui.findAll({ type: 'Svg' })
-    expect(drawings).toHaveLength(surface === 'desktop' ? 1 : 0)
+    expect(drawings).toHaveLength(surface === 'desktop' ? 3 : 0)
     if (surface === 'desktop') {
       expect(drawings[0]!.props.width).toBe(18)
       expect(String(drawings[0]!.props.source)).toContain('stroke-dasharray=')
@@ -529,7 +529,7 @@ test('a refresh refused at the usage limit is not retried before the limit reset
   const props = { hasSurvey: false, isWorking: false, maxRows: 10, bodyColumns: 120, scroll: { offset: 0, bodyRows: 10 }, view: {} }
   const band = await $.ui.mount({ plugin: 'cache-context', surface: 'desktop', component: 'AbovePrompt', props })
   expect((await band.find({ key: 'quick-refresh' }))?.text).toContain(`Refresh ${fmtClock(START + 180 * MINUTE)}`)
-  expect((await band.findAll({ type: 'Text', text: '●' }))[0]?.props.color).toBe('warning')
+  expect((await band.findAll({ type: 'Svg' })).find((one: any) => one.props.alt === 'busy')).toBeDefined()
 })
 
 test('a refresh refused at the usage limit resumes once the limit resets before the cache ends', { timeoutMs: 30_000 }, async ($, on) => {
@@ -866,7 +866,7 @@ test('the drawings move when the cache\'s state does, and a redraw carries a mov
     const strip = (await ui.drawn()).children.at(-1)
     const seen = {
       color: (await ui.find({ type: 'Text', text: head }))?.props.color,
-      ring: String((await ui.findAll({ type: 'Svg' })).at(-1)!.props.source),
+      ring: String((await ui.findAll({ type: 'Svg' })).filter(one => one.props.width === 18).at(-1)!.props.source),
       beforeDetails: strip?.children.at(-2)?.props.flexGrow,
     }
     await ui.unmount()
@@ -1072,7 +1072,8 @@ test('the band draws its ring as it stands when it returns from a survey', { tim
   await hidden.unmount()
   await clock.advance(2 * MINUTE)
   const after = await drawn('band')
-  expect(after.drawings).toHaveLength(1)
+  // The ring, and the two quick toggles' dots.
+  expect(after.drawings).toHaveLength(3)
   expect(after.ring).toContain('dur="3420.000s"')
 })
 

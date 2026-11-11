@@ -380,12 +380,12 @@ test('the continue switch turns off and back on, apart from Claude Code\'s own s
 
 const BAND_PROPS = { hasSurvey: false, isWorking: false, maxRows: 10, bodyColumns: 120, scroll: { offset: 0, bodyRows: 10 }, view: {} }
 
-// The band on the desktop, where the only dots are the two toggles': refresh first, then the guard.
+// The band on the desktop, with the two toggles' dots: refresh first, then the guard.
 async function band($: any, isWorking = false) {
   const ui = await $.ui.mount({ plugin: 'cache-context', surface: 'desktop', component: 'AbovePrompt', props: { ...BAND_PROPS, isWorking } })
-  const dots = await ui.findAll({ type: 'Text', text: '●' })
+  const dots = (await ui.findAll({ type: 'Svg' })).filter((one: any) => ['on', 'off', 'busy'].includes(one.props.alt))
 
-  return { ui, refresh: dots[0]?.props.color, guard: dots[1]?.props.color }
+  return { ui, refresh: dots[0]?.props.alt, guard: dots[1]?.props.alt }
 }
 
 test('the band holds both toggles, and keeps them while Claude works', async ($, on) => {
@@ -395,8 +395,8 @@ test('the band holds both toggles, and keeps them while Claude works', async ($,
     const { ui, refresh, guard } = await band($, isWorking)
     expect((await ui.find({ key: 'quick-refresh' }))?.text).toContain('Refresh')
     expect((await ui.find({ key: 'quick-guard' }))?.text).toContain('Guard')
-    expect(refresh).toBe('inactive')
-    expect(guard).toBe('success')
+    expect(refresh).toBe('off')
+    expect(guard).toBe('on')
     expect((await ui.find({ key: 'compact' })) !== undefined).toBe(!isWorking)
   }
 })
@@ -405,17 +405,17 @@ test('the band\'s toggles turn auto-refresh and the guard on and off, and keep t
   const { world } = await guarded($, on, { percent: 42 })
   await turnWithReply($)
   await (await band($)).ui.press({ key: 'quick-refresh' })
-  expect((await band($)).refresh).toBe('success')
+  expect((await band($)).refresh).toBe('on')
   expect(world.kept.get('auto')).toMatchObject({ isOn: true })
   await (await band($)).ui.press({ key: 'quick-refresh' })
-  expect((await band($)).refresh).toBe('inactive')
+  expect((await band($)).refresh).toBe('off')
   expect(world.kept.get('auto')).toMatchObject({ isOn: false })
 
   await (await band($)).ui.press({ key: 'quick-guard' })
-  expect((await band($)).guard).toBe('inactive')
+  expect((await band($)).guard).toBe('off')
   expect(world.kept.get('usageGuard')).toMatchObject({ isOn: false })
   await (await band($)).ui.press({ key: 'quick-guard' })
-  expect((await band($)).guard).toBe('success')
+  expect((await band($)).guard).toBe('on')
   expect(world.kept.get('usageGuard')).toMatchObject({ isOn: true })
 })
 
@@ -425,7 +425,7 @@ test('while wrapping up or paused the guard toggle says so, and a press opens th
   await turnWithReply($)
   let now = await band($)
   expect((await now.ui.find({ key: 'quick-guard' }))?.text).toContain('Wrapping up 97%')
-  expect(now.guard).toBe('warning')
+  expect(now.guard).toBe('busy')
   // The usage is no longer spelled out beside the countdown.
   expect(await now.ui.find({ type: 'Text', text: /usage 97%/ })).toBeUndefined()
   await now.ui.press({ key: 'quick-guard' })

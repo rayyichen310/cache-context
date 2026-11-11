@@ -144,7 +144,8 @@ test('the band shows the context ring, its fill and compact on one line', { time
   for (const surface of SURFACES) {
     const ui = await $.ui.mount({ plugin: 'cache-context', surface, component: 'AbovePrompt', props: bandProps(false) })
     expect(await ui.find({ type: 'Text', text: '上下文 182.6k/350k (52%)' })).toBeDefined()
-    expect((await ui.findAll({ type: 'Svg' })).length).toBe(surface === 'desktop' ? 1 : 0)
+    // The context ring and the two quick toggles' dots.
+    expect((await ui.findAll({ type: 'Svg' })).length).toBe(surface === 'desktop' ? 3 : 0)
     expect((await ui.find({ type: 'Text', text: '◔' })) !== undefined).toBe(surface === 'terminal')
     expect(await ui.find({ key: 'details' })).toBeDefined()
     await ui.press({ key: 'compact' })
