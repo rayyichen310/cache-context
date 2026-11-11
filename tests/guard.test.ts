@@ -424,7 +424,7 @@ test('while wrapping up or paused the guard toggle says so, and a press opens th
   const { opened } = world
   await turnWithReply($)
   let now = await band($)
-  expect((await now.ui.find({ key: 'quick-guard' }))?.text).toContain('Wrapping up 97%')
+  expect((await now.ui.find({ key: 'quick-guard' }))?.text).toContain('Guard · wrapping up 97%')
   expect(now.guard).toBe('busy')
   // The usage is no longer spelled out beside the countdown.
   expect(await now.ui.find({ type: 'Text', text: /usage 97%/ })).toBeUndefined()
@@ -433,13 +433,13 @@ test('while wrapping up or paused the guard toggle says so, and a press opens th
 
   await endTurn($, 't1')
   now = await band($)
-  expect((await now.ui.find({ key: 'quick-guard' }))?.text).toContain(`Continues ${fmtClock(RESUME)}`)
-  expect(await now.ui.find({ type: 'Text', text: /Paused/ })).toBeUndefined()
+  expect((await now.ui.find({ key: 'quick-guard' }))?.text).toContain(`Guard · continues ${fmtClock(RESUME)}`)
+  expect(await now.ui.find({ type: 'Text', text: /continues at/ })).toBeUndefined()
   await now.ui.press({ key: 'quick-guard' })
   expect(opened).toEqual(['cache', 'cache'])
   expect(world.kept.get('usageGuard')).toMatchObject({ isOn: true })
 
   // With no continue planned it reads as paused.
   await (await pane($)).press({ key: 'guard-cancel' })
-  expect((await (await band($)).ui.find({ key: 'quick-guard' }))?.text).toContain('Paused')
+  expect((await (await band($)).ui.find({ key: 'quick-guard' }))?.text).toContain('Guard · paused')
 })
