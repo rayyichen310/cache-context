@@ -6,6 +6,7 @@ import { contextWords } from './context'
 import type { ContextWords } from './context'
 import { detect, follow } from './detect'
 import { PING_MARGIN_MS, TTL_MS, WRITE_MULTIPLIER, fmtRemaining, fmtTokens, fmtUsd, priceOf } from './economics'
+import { blockingReset, fmtClock, isPastLimit, limitWords } from './limits'
 import { LANGS, MESSAGES, langFrom } from './messages'
 import type { Lang, LangSource } from './messages'
 import {
@@ -53,7 +54,11 @@ const HEARD = 'langHeard'
 
 type TtlChoice = Pick<Snapshot, 'ttl' | 'ttlSource'>
 
-type PingResult = { text: string; verdict: Verdict | null }
+// How long an automatic refresh waits after one that failed for any reason but the usage limit.
+const RETRY_MS = 60_000
+
+/** What a ping said; `failure` when a request went out and refreshed nothing: refused at the usage limit, or else. */
+type PingResult = { text: string; verdict: Verdict | null; failure?: 'limit' | 'other' }
 
 // What the environment pins the TTL to; undefined until first read.
 let configured: TtlChoice | null | undefined
@@ -70,6 +75,8 @@ let heard: Record<string, number> = {}
 let heardLang: Lang | null | undefined
 // When the ping under way went out; null with none.
 let pingAt: number | null = null
+// No automatic refresh before this moment: the usage limit's reset, a failed one's wait, or Infinity until the next reply.
+let autoHeldUntil = 0
 // Main-thread requests under way: each touched the cache as it started.
 let inFlight = 0
 // No person at the engine's own prompt, as in the desktop app's local sessions: compaction there runs only as a /compact prompt.
@@ -398,6 +405,8 @@ async function recordStep(
     }
   }
 
+  // A reply went through, so whatever held automatic refreshes back no longer does.
+  autoHeldUntil = 0
   // Noted before the write: the redraw the write causes must already find it.
   const at = await $.clock.now()
   refill = { at, from: shareLeft(previous, at) }
@@ -432,9 +441,13 @@ async function ping($: EngineInterface, isForced: boolean): Promise<PingResult> 
   $.ui.invalidate('ui.render')
   try {
     const reply = await $.model.fork({ prompt: PING_PROMPT })
-    if (!reply.isAnswered && reply.reason === 'nothing-to-fork') return { text: m.pingNoFork, verdict: null }
+    if (!reply.isAnswered && reply.reason === 'nothing-to-fork') {
+      return { text: m.pingNoFork, verdict: null, failure: 'other' }
+    }
     if (!reply.isAnswered && reply.reason === 'api-error') {
-      return { text: m.pingApiError(reply.error, reply.status), verdict: null }
+      const failure = reply.status === 429 ? 'limit' : 'other'
+
+      return { text: m.pingApiError(reply.error, reply.status), verdict: null, failure }
     }
 
     const { usage } = reply
@@ -445,7 +458,7 @@ async function ping($: EngineInterface, isForced: boolean): Promise<PingResult> 
       input: usage.input_tokens,
       output: usage.output_tokens,
     }
-    if (lastPing.read + lastPing.created + lastPing.input === 0) return { text: m.pingCut, verdict: null }
+    if (lastPing.read + lastPing.created + lastPing.input === 0) return { text: m.pingCut, verdict: null, failure: 'other' }
     const verdict = verdictOf(lastPing.read, held.cachedTokens)
     const hasRewritten = verdict !== 'hit' && lastPing.created >= held.cachedTokens * HIT
     const evidence = extensionEvidence(held, startedAt, verdict)
@@ -536,9 +549,33 @@ export const register: Register = on => {
       const remaining = remainingOf(held, now)
       if (remaining <= PING_MARGIN_MS || remaining > LEAD_MS[held.ttl]) return
       const budget = budgetOf(held, policy.cap, await knownExtension($))
-      if (held.pingsSinceTurn >= budget) return
+      if (held.pingsSinceTurn >= budget || now < autoHeldUntil) return
+      const w = limitWords(m.tag)
+      const holdForLimit = (limits: Parameters<typeof blockingReset>[0]): string => {
+        const reset = blockingReset(limits)
+        autoHeldUntil = reset ?? Infinity
+
+        return reset === null ? w.heldNoReset : w.heldUntil(fmtClock(reset))
+      }
+      // A plan window already used up refuses the request: wait for its reset instead of sending one.
+      const before = (await $.session.usage()).rateLimits
+      if (isPastLimit(before)) {
+        $.ui.log(holdForLimit(before))
+        return
+      }
       const sent = await ping($, false)
-      $.ui.log(m.autoLog(held.pingsSinceTurn + 1, budget, sent.text))
+      const line = m.autoLog(held.pingsSinceTurn + 1, budget, sent.text)
+      if (sent.failure === 'limit') {
+        // Refused for the usage limit: it refreshed nothing, so it spends none of the budget.
+        $.ui.log(`${line} ${holdForLimit((await $.session.usage()).rateLimits)}`)
+        return
+      }
+      if (sent.failure === 'other') {
+        // Nothing refreshed, but the try counts, and the next waits, so a failure cannot repeat every second.
+        await update($, snap, s => (s === null ? s : { ...s, pingsSinceTurn: s.pingsSinceTurn + 1 }))
+        autoHeldUntil = now + RETRY_MS
+      }
+      $.ui.log(line)
       if (sent.verdict !== 'hit') $.ui.toast(m.autoMissToast)
     })
     const m = MESSAGES[await langOf($)]

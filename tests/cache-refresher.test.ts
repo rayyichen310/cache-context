@@ -237,10 +237,12 @@ test('the band draws the countdown on the terminal and the desktop', { timeoutMs
 const HOUR_ENV = { CLAUDE_CODE_PROMPT_CACHE_TTL: '1h' }
 
 const logged: string[] = []
+const toasted: string[] = []
 
 // Starts the session as the engine does, so the mod's timer and commands exist.
 async function boot($: any, on: any, onInvalidate?: () => void) {
   logged.length = 0
+  toasted.length = 0
   on('session.start', (_: unknown, e: { cwd: string }) => ({ cwd: e.cwd }))
   on('command.register', (_: unknown, e: { name: string }) => ({ value: { command: e.name } }))
   on('ui.invalidate', () => {
@@ -249,7 +251,11 @@ async function boot($: any, on: any, onInvalidate?: () => void) {
     return { value: undefined }
   })
   on('ui.panes', () => ({ value: [] }))
-  on('ui.toast', () => ({ value: undefined }))
+  on('ui.toast', (_: unknown, e: { text: string }) => {
+    toasted.push(e.text)
+
+    return { value: undefined }
+  })
   on('ui.log', (_: unknown, e: { text: string }) => {
     logged.push(e.text)
 
@@ -405,6 +411,7 @@ test('auto sends one ping per idle stretch until a ping is proven to extend the 
   const clock = mock.clock(on, { now: START })
   mock.store(on)
   mock.env(on, HOUR_ENV)
+  on('session.usage', usageWith([]))
   let forks = 0
   on('model.fork', () => {
     forks += 1
@@ -433,10 +440,121 @@ test('auto sends one ping per idle stretch until a ping is proven to extend the 
   expect(logged[0]).toContain('Auto-refresh 1/1. Cache refreshed: read 80k')
 })
 
+// A refresh the API refused for the plan's usage.
+function forkRateLimited() {
+  return { value: { isAnswered: false, reason: 'api-error', error: 'rate_limit', status: 429 } }
+}
+
+function usageWith(rateLimits: unknown[]) {
+  return () => ({ value: { startedAt: START, context: { window: 1_000_000 }, rateLimits } })
+}
+
+async function idleAfterOneTurn($: any, on: any) {
+  on('turn.step', async function* (_: unknown, e: any) {
+    return { turnId: e.turnId, index: e.index, answer: 'hi', toolUses: [], stopReason: 'end_turn', usage: usage(0, 80_000) }
+  })
+  await boot($, on)
+  const step = $.turn.step({ turnId: 't1', index: 0, model: 'claude-sonnet-5-5', messageCount: 1 })
+  for await (const _ of step) void _
+  await step.result
+  await $.command.run({ command: 'cache-auto', args: 'on 3' })
+}
+
+test('a refresh refused at the usage limit is not retried before the limit resets', { timeoutMs: 30_000 }, async ($, on) => {
+  const clock = mock.clock(on, { now: START })
+  mock.store(on)
+  mock.env(on, HOUR_ENV)
+  on('session.usage', usageWith([{ kind: 'five_hour', percentUsed: 99.5, resetsAt: new Date(START + 180 * MINUTE).toISOString() }]))
+  let forks = 0
+  on('model.fork', () => {
+    forks += 1
+
+    return forkRateLimited()
+  })
+  await idleAfterOneTurn($, on)
+
+  await clock.advance(54 * MINUTE)
+  expect(forks).toBe(0)
+  // The whole lead window and past the cache's end: one try, one line, no toast.
+  await clock.advance(10 * MINUTE)
+  expect(forks).toBe(1)
+  expect(logged).toHaveLength(1)
+  expect(toasted).toHaveLength(0)
+})
+
+test('a refresh refused at the usage limit resumes once the limit resets before the cache ends', { timeoutMs: 30_000 }, async ($, on) => {
+  const clock = mock.clock(on, { now: START })
+  mock.store(on, { pingExtends: { '1h': true } })
+  mock.env(on, HOUR_ENV)
+  on('session.usage', usageWith([{ kind: 'five_hour', percentUsed: 99.5, resetsAt: new Date(START + 57 * MINUTE).toISOString() }]))
+  let forks = 0
+  on('model.fork', () => {
+    forks += 1
+
+    return forks === 1 ? forkRateLimited() : forkHit()
+  })
+  await idleAfterOneTurn($, on)
+
+  await clock.advance(56 * MINUTE)
+  expect(forks).toBe(1)
+  await clock.advance(MINUTE / 2)
+  expect(forks).toBe(1)
+  await clock.advance(MINUTE)
+  expect(forks).toBe(2)
+  // The refused try did not use up one of the three.
+  const status = await $.command.run({ command: 'cache-status', args: '' })
+  expect(status.text).toContain('on, 1 of 3 used')
+})
+
+test('a refresh known to be past the usage limit is not sent at all', { timeoutMs: 30_000 }, async ($, on) => {
+  const clock = mock.clock(on, { now: START })
+  mock.store(on)
+  mock.env(on, HOUR_ENV)
+  on('session.usage', usageWith([{ kind: 'five_hour', percentUsed: 100, resetsAt: new Date(START + 180 * MINUTE).toISOString() }]))
+  let forks = 0
+  on('model.fork', () => {
+    forks += 1
+
+    return forkHit()
+  })
+  await idleAfterOneTurn($, on)
+
+  await clock.advance(64 * MINUTE)
+  expect(forks).toBe(0)
+  expect(logged).toHaveLength(1)
+  expect(toasted).toHaveLength(0)
+})
+
+test('any other failed refresh counts as one and waits a minute before the next', { timeoutMs: 30_000 }, async ($, on) => {
+  const clock = mock.clock(on, { now: START })
+  mock.store(on, { pingExtends: { '1h': true } })
+  mock.env(on, HOUR_ENV)
+  on('session.usage', usageWith([]))
+  let forks = 0
+  on('model.fork', () => {
+    forks += 1
+
+    return { value: { isAnswered: false, reason: 'api-error', error: 'overloaded_error', status: 529 } }
+  })
+  await idleAfterOneTurn($, on)
+
+  await clock.advance(55 * MINUTE + 1000)
+  expect(forks).toBe(1)
+  await clock.advance(MINUTE - 5000)
+  expect(forks).toBe(1)
+  await clock.advance(10_000)
+  expect(forks).toBe(2)
+  // Three tries spend the cap of three; none follows.
+  await clock.advance(2 * MINUTE)
+  expect(forks).toBe(3)
+  expect(logged).toHaveLength(3)
+})
+
 test('a hit past the turn\'s own lifetime proves pings and unlocks the chain up to the cap', { timeoutMs: 60_000 }, async ($, on) => {
   const clock = mock.clock(on, { now: START })
   mock.store(on)
   mock.env(on, HOUR_ENV)
+  on('session.usage', usageWith([]))
   let forks = 0
   on('model.fork', () => {
     forks += 1
