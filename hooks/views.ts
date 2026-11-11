@@ -1,9 +1,11 @@
 import type { Elements, RenderElement, RenderNode } from 'claude-code'
 
-import type { ContextFile, ContextListKey, ContextLists, ContextMeter, Segment, Snapshot } from '../types'
+import type { ContextFile, ContextListKey, ContextLists, ContextMeter, Guard, GuardRun, Segment, Snapshot } from '../types'
 import { CONTEXT_BLUE, amountText, barRuns, barSvg, contextWords, fillRingSvg, fillText, fmtK, hexOf, legendGroups, percentOf, toAutoText } from './context'
 import type { ContextWords } from './context'
 import { TTL_MS, fmtRemaining, fmtSpan, fmtTokens, fmtUsd } from './economics'
+import { GRACE_TOOLS, fmtClock, fmtWait, limitWords, refreshesUntil } from './limits'
+import type { LimitWords } from './limits'
 import { MESSAGES } from './messages'
 import type { Messages } from './messages'
 import { LEAD_MS, budgetOf, costsOf, isTracked, remainingOf } from './model'
@@ -77,6 +79,69 @@ export type PaneHandlers = {
   onCapDown: () => void
   onCapUp: () => void
   onPing: () => void
+}
+
+/** The usage guard as a draw needs it: its settings and where it stands. */
+export type GuardView = { settings: Guard; run: GuardRun }
+
+/** The usage guard with the panel's controls for it. */
+export type GuardPart = GuardView & {
+  onToggle: () => void
+  onThresholdDown: () => void
+  onThresholdUp: () => void
+  onAutoContinue: () => void
+  onStop: () => void
+  onSkip: () => void
+  onResume: () => void
+  onCancelResume: () => void
+}
+
+/** When a cache counting down ends with nothing more done; null with none. */
+function cacheEndOf(held: Snapshot | null, now: number): number | null {
+  if (!isTracked(held)) return null
+  const remaining = remainingOf(held, now)
+
+  return remaining > 0 ? now + remaining : null
+}
+
+/** A refresh refused at the usage limit: refreshing resumes after the reset, or the cache ends before it. */
+function limitLine(w: LimitWords, reset: number | null, cacheEnd: number | null, isBand: boolean): string {
+  if (reset === null) return w.heldNoReset
+  if (cacheEnd === null || cacheEnd > reset) return w.limitResume(fmtClock(reset))
+
+  return isBand ? w.bandLimitExpiry(fmtClock(cacheEnd)) : w.limitRebuild(fmtClock(cacheEnd))
+}
+
+/** A pause with no continue planned: why, and when the usage comes back. */
+function pausedLine(w: LimitWords, run: GuardRun): string {
+  if (run.isWeekly) return w.pausedWeekly
+
+  return run.resetsAt === null ? w.pausedNoReset : w.pausedManual(fmtClock(run.resetsAt))
+}
+
+const fmtPercent = (percent: number | null) => (percent === null ? '?' : String(Math.floor(percent)))
+
+/** The guard's words in the band: before the cache's ring while paused or at the limit, after its countdown while wrapping up. */
+function guardBand(w: LimitWords, g: GuardView | null, held: Snapshot | null, now: number): { before: string | null; after: string | null } {
+  if (g === null) return { before: null, after: null }
+  const { settings, run } = g
+  if (settings.isOn && (run.phase === 'wrapping' || run.phase === 'blocking')) return { before: null, after: w.bandWrapping(fmtPercent(run.percent)) }
+  if (settings.isOn && run.phase === 'paused') {
+    return { before: run.resumeAt !== null ? w.bandPausedAuto(fmtClock(run.resumeAt)) : pausedLine(w, run), after: null }
+  }
+  if (settings.isOn && run.phase === 'resumeFailed') return { before: w.resumeFailed, after: null }
+  if (run.limit !== null) return { before: limitLine(w, run.limit.reset, cacheEndOf(held, now), true), after: null }
+
+  return { before: null, after: null }
+}
+
+/** The five-hour usage as a thin bar, with a tick where wrapping up begins. */
+function usageBarSvg(percent: number, threshold: number, locale: DrawingLocale): string {
+  const width = PANEL_PIXELS
+  const fill = Math.round(width * Math.min(1, Math.max(0, percent / 100)))
+  const tick = Math.round(width * (threshold / 100))
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" lang="${locale.tag}" viewBox="0 0 ${width} 6">${styleOf(locale.fonts)}<rect width="${width}" height="6" rx="3" fill="${TRACK}"/><rect width="${fill}" height="6" rx="3" fill="${EMBER}"/><rect x="${tick - 1}" width="2" height="6" fill="${SECONDARY}"/></svg>`
 }
 
 /** The surface's Svg where it draws one: the terminal's table takes an Svg and shows nothing for it. */
@@ -366,6 +431,7 @@ export function bandView(
   motion: Motion,
   onDetails: () => void,
   ctx: ContextPart,
+  guardView: GuardView | null = null,
 ): RenderElement {
   const { Box, Text, Button } = els
   const Svg = svgOf(els, surface)
@@ -373,6 +439,8 @@ export function bandView(
   const children: RenderNode[] = []
 
   const { held, now, policy, known } = view
+  const guarded = guardBand(limitWords(m.tag), guardView, held, now)
+  if (guarded.before !== null) children.push(Text({ color: 'warning', children: [guarded.before] }))
   if (isTracked(held)) {
     const remaining = remainingOf(held, now)
     const head = remaining > 0 ? fmtRemaining(remaining) : held.coldReason === null ? m.bandCold : m.bandUnusable
@@ -389,6 +457,7 @@ export function bandView(
       Text({ bold: true, ...emphasis, children: [head] }),
     )
   }
+  if (guarded.after !== null) children.push(Text({ color: 'warning', children: [guarded.after] }))
 
   const meter = ctx.meter
   if (meter !== null) {
@@ -604,6 +673,7 @@ export function paneView(
   columns: number,
   motion: Motion = STILL,
   ctx: ContextPart | null = null,
+  guardPart: GuardPart | null = null,
 ): RenderElement {
   const { Box, Text, Button } = els
   const Svg = svgOf(els, surface)
@@ -816,6 +886,77 @@ export function paneView(
     footer.push(words(left > 0 ? m.priceNote(fmtUsd(left * costs.pingUsd)) : m.listPrice, 'small', PANEL_PIXELS))
   }
 
+  // The usage guard, beneath the keep-alive it works with.
+  const guardRows: RenderNode[] = []
+  if (guardPart !== null) {
+    const w = limitWords(m.tag)
+    const { settings, run } = guardPart
+    const buttons = (children: RenderNode[]) => Box({ flexDirection: 'row', columnGap: 1, children })
+    guardRows.push(between([
+      words(w.title, 'title'),
+      Button({ key: 'guard-toggle', label: settings.isOn ? w.btnOff : w.btnOn, variant: settings.isOn ? 'secondary' : 'primary', onPress: guardPart.onToggle }),
+    ]))
+    if (settings.isOn && run.phase === 'watching') {
+      const reading = run.percent === null
+        ? w.fiveHour
+        : `${w.fiveHour} ${fmtPercent(run.percent)}%${run.resetsAt === null ? '' : ` · ${w.resets(fmtClock(run.resetsAt))}`}`
+      guardRows.push(words(reading, 'body', PANEL_PIXELS))
+      if (run.percent !== null) {
+        if (Svg) {
+          guardRows.push(Svg({ alt: reading, width: PANEL_PIXELS, height: 6, source: usageBarSvg(run.percent, settings.threshold, m) }))
+        } else {
+          const width = Math.max(10, Math.min(PANEL_CELLS, columns) - 2)
+          const lit = Math.round(width * Math.min(1, run.percent / 100))
+          guardRows.push(Box({ flexDirection: 'row', children: [Text({ color: EMBER, children: ['█'.repeat(lit)] }), Text({ dimColor: true, children: ['░'.repeat(width - lit)] })] }))
+        }
+      }
+      const thresholdWords = `${settings.threshold}%`
+      guardRows.push(between([
+        words(w.threshold, 'body'),
+        Box({
+          flexDirection: 'row',
+          columnGap: 1,
+          alignItems: 'center',
+          flexShrink: 0,
+          children: [
+            Button({ key: 'guard-down', label: '−', variant: 'secondary', onPress: guardPart.onThresholdDown }),
+            words(thresholdWords, 'count', thresholdWords.length * 9 + 2),
+            Button({ key: 'guard-up', label: '+', variant: 'secondary', onPress: guardPart.onThresholdUp }),
+          ],
+        }),
+      ]))
+      guardRows.push(run.autoContinue === null
+        ? dim(`${w.autoContinue}: ${w.autoContinueNone}`)
+        : between([
+            words(w.autoContinue, 'body'),
+            Button({ key: 'guard-continue', label: run.autoContinue ? w.btnOff : w.btnOn, variant: 'secondary', onPress: guardPart.onAutoContinue }),
+          ]))
+    } else if (settings.isOn && (run.phase === 'wrapping' || run.phase === 'blocking')) {
+      guardRows.push(dim(run.phase === 'wrapping' ? w.wrapping : w.blocking))
+      if (run.phase === 'wrapping') guardRows.push(dim(w.wrappingLeft(Math.max(0, GRACE_TOOLS - run.toolsUsed))))
+      guardRows.push(buttons([
+        Button({ key: 'guard-stop', label: w.btnStop, variant: 'primary', onPress: guardPart.onStop }),
+        Button({ key: 'guard-skip', label: w.btnSkip, variant: 'secondary', onPress: guardPart.onSkip }),
+      ]))
+    } else if (settings.isOn && run.phase === 'paused') {
+      guardRows.push(dim(run.resumeAt !== null ? w.pausedAuto(fmtClock(run.resumeAt), fmtWait(run.resumeAt - now)) : pausedLine(w, run)))
+      if (tracked && remaining > 0 && run.resetsAt !== null) {
+        // With the refreshes left the cache lasts this long: past the reset, or not.
+        const lastsUntil = now + remaining + (policy.isOn ? left * stretch : 0)
+        guardRows.push(dim(lastsUntil >= run.resetsAt
+          ? w.cacheKept(refreshesUntil(run.resetsAt, now + remaining, stretch))
+          : w.cacheLost(fmtClock(lastsUntil))))
+      }
+      guardRows.push(buttons([
+        Button({ key: 'guard-resume', label: w.btnResume, variant: 'primary', onPress: guardPart.onResume }),
+        ...(run.resumeAt !== null ? [Button({ key: 'guard-cancel', label: w.btnCancelResume, variant: 'secondary', onPress: guardPart.onCancelResume })] : []),
+      ]))
+    } else if (settings.isOn && run.phase === 'resumeFailed') {
+      guardRows.push(dim(w.resumeFailed), buttons([Button({ key: 'guard-resume', label: w.btnResume, variant: 'primary', onPress: guardPart.onResume })]))
+    }
+    if (run.limit !== null) guardRows.push(dim(limitLine(w, run.limit.reset, cacheEndOf(held, now), false)))
+  }
+
   if (!Svg) {
     // A terminal counts in lines: one between sections, none inside them.
     return Box({
@@ -829,11 +970,21 @@ export function paneView(
         Text({ dimColor: true, children: ['─'.repeat(METER_CELLS)] }),
         Box({ flexDirection: 'column', children: switchRows }),
         Box({ flexDirection: 'column', children: footer }),
+        ...(guardRows.length === 0
+          ? []
+          : [Text({ dimColor: true, children: ['─'.repeat(METER_CELLS)] }), Box({ flexDirection: 'column', children: guardRows })]),
       ],
     })
   }
 
   // The desktop counts in 8px steps: three between sections, two under the rule, one between the rows of a section.
+  const rule = () => Svg({
+    alt: '—',
+    width: PANEL_PIXELS,
+    height: 1,
+    source: `<svg xmlns="http://www.w3.org/2000/svg" lang="${m.tag}" viewBox="0 0 ${PANEL_PIXELS} 1"><rect width="${PANEL_PIXELS}" height="1" fill="${TRACK}"/></svg>`,
+  })
+
   return Box({
     flexDirection: 'column',
     rowGap: 3,
@@ -845,17 +996,12 @@ export function paneView(
       Box({
         flexDirection: 'column',
         rowGap: 2,
-        children: [
-          Svg({
-            alt: '—',
-            width: PANEL_PIXELS,
-            height: 1,
-            source: `<svg xmlns="http://www.w3.org/2000/svg" lang="${m.tag}" viewBox="0 0 ${PANEL_PIXELS} 1"><rect width="${PANEL_PIXELS}" height="1" fill="${TRACK}"/></svg>`,
-          }),
-          Box({ flexDirection: 'column', rowGap: 1, children: switchRows }),
-        ],
+        children: [rule(), Box({ flexDirection: 'column', rowGap: 1, children: switchRows })],
       }),
       Box({ flexDirection: 'column', rowGap: 1, children: footer }),
+      ...(guardRows.length === 0
+        ? []
+        : [Box({ flexDirection: 'column', rowGap: 2, children: [rule(), Box({ flexDirection: 'column', rowGap: 1, children: guardRows })] })]),
     ],
   })
 }

@@ -723,8 +723,8 @@ test('the panel draws the dial, sets a lapse against a ping, and its buttons dri
   // The desktop: everything that is read is drawn in one type, at the sizes measured on the app; only buttons are the app's own.
   const desk = await $.ui.mount({ plugin: 'cache-context', surface: 'desktop', component: 'Pane', requestId: 'cache', props })
   const drawings = await desk.findAll({ type: 'Svg' })
-  // Three drawings for the card instead of one, then the same six drawings for the controls and footer.
-  expect(drawings).toHaveLength(9)
+  // Three drawings for the card instead of one, the same six for the controls and footer, then the usage guard's rule and title.
+  expect(drawings).toHaveLength(11)
   expect(drawings[0]!.props.width).toBe(60)
   expect(drawings[0]!.props.height).toBe(60)
   expect(String(drawings[0]!.props.source)).not.toContain('<text')

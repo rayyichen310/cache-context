@@ -1,12 +1,31 @@
 import { atom, read, update } from 'claude-code'
 import type { ContextAgent, EngineInterface, ModelUsage, Register, SessionContextBreakdown } from 'claude-code'
 
-import type { Auto, ContextFile, ContextLists, ContextListKey, ContextMeter, Snapshot, Ttl } from '../types'
+import type { Auto, ContextFile, ContextLists, ContextListKey, ContextMeter, Guard, GuardRun, Snapshot, Ttl } from '../types'
 import { contextWords } from './context'
 import type { ContextWords } from './context'
 import { detect, follow } from './detect'
 import { PING_MARGIN_MS, TTL_MS, WRITE_MULTIPLIER, fmtRemaining, fmtTokens, fmtUsd, priceOf } from './economics'
-import { blockingReset, fmtClock, isPastLimit, limitWords } from './limits'
+import {
+  ABORT_AFTER_DENIED,
+  DEFAULT_GUARD,
+  GRACE_TOOLS,
+  HARD_PERCENT,
+  IDLE_RUN,
+  MAX_RESUME_RETRIES,
+  MAX_THRESHOLD,
+  MIN_THRESHOLD,
+  RESUME_DELAY_MS,
+  WRAP_UP_REMINDER,
+  blockingReset,
+  fiveHourOf,
+  fmtClock,
+  isPastLimit,
+  isWeeklyFull,
+  keptGuard,
+  limitWords,
+  resumeRetryMs,
+} from './limits'
 import { LANGS, MESSAGES, langFrom } from './messages'
 import type { Lang, LangSource } from './messages'
 import {
@@ -42,6 +61,8 @@ const context = atom({ plugin: 'cache-context', key: 'context' } as const, null)
 const isCompacting = atom({ plugin: 'cache-context', key: 'isCompacting' } as const, false)
 const isLegendOpen = atom({ plugin: 'cache-context', key: 'isLegendOpen' } as const, false)
 const openLists = atom({ plugin: 'cache-context', key: 'openLists' } as const, [] as ContextListKey[])
+const guard = atom({ plugin: 'cache-context', key: 'guard' } as const, DEFAULT_GUARD)
+const guardRun = atom({ plugin: 'cache-context', key: 'guardRun' } as const, IDLE_RUN)
 
 const PING_PROMPT =
   'Prompt-cache keep-alive from the cache-refresher plugin. Reply with exactly: ok'
@@ -60,6 +81,14 @@ const HOLD_BEAT_MS = 60_000
 const HOLD_STALE_MS = 5 * 60_000
 // The auto-refresh switch and its limit as last chosen, kept across restarts.
 const AUTO = 'auto'
+// The usage guard's settings, kept across restarts, and each session's pause, so a restart plans its continue again.
+const GUARD = 'usageGuard'
+const PAUSES = 'usagePauses'
+// A kept pause this long past its reset belongs to a session that will not come back for it.
+const PAUSE_STALE_MS = 24 * 60 * 60_000
+const FIVE_HOURS_MS = 5 * 60 * 60_000
+// Prompts the person sent, from any client, or Claude Code's own continue at the reset: each ends a pause.
+const PERSON_KINDS = ['composer', 'bridge', 'sdk', 'slack-ping', 'auto-continuation']
 
 type TtlChoice = Pick<Snapshot, 'ttl' | 'ttlSource'>
 
@@ -100,6 +129,9 @@ let titledIn: Lang | undefined
 let heldBeatAt = 0
 // Changes to the hold run one at a time, so two quick toggles cannot interleave.
 let holdQueue: Promise<unknown> = Promise.resolve()
+// The main conversation's turn under way, for the guard to end; and the turn its continue prompt started.
+let mainTurnId: string | null = null
+let resumeTurnId: string | null = null
 // When the panel was last opened: its entrance plays from that moment.
 let openedAt: number | undefined
 // The touch that last refilled the cache, and the share of its lifetime left before it: the ring sweeps back from there.
@@ -304,6 +336,164 @@ async function setAuto($: EngineInterface, change: (held: Auto) => Auto): Promis
   return outcome === 'paused' ? m.idlePaused : m.idleRestored
 }
 
+/** A pause as the store keeps it for a restart. */
+type KeptPause = Pick<GuardRun, 'resetsAt' | 'isWeekly' | 'resumeAt' | 'resumeTries'> & { phase: 'paused' | 'resumeFailed' }
+
+function keptPauses(held: unknown): Record<string, KeptPause> {
+  return typeof held === 'object' && held !== null ? (held as Record<string, KeptPause>) : {}
+}
+
+async function setGuard($: EngineInterface, change: (held: Guard) => Guard): Promise<Guard> {
+  const held = await update($, guard, change)
+  await $.store.set(GUARD, held)
+  $.ui.invalidate('ui.render')
+
+  return held
+}
+
+async function changeRun($: EngineInterface, change: (run: GuardRun) => GuardRun): Promise<GuardRun> {
+  const run = await update($, guardRun, change)
+  $.ui.invalidate('ui.render')
+
+  return run
+}
+
+/** Claude Code's own "continue at the usage-limit reset" setting; null where this version has none. */
+async function readAutoContinue($: EngineInterface): Promise<boolean | null> {
+  const row = (await $.config.list()).find(each => each.key === 'autoContinueAtUsageLimit')
+
+  return typeof row?.value === 'boolean' ? row.value : null
+}
+
+/** Reads the plan's windows, noting the five-hour one's use and reset for the guard. */
+async function readUsage($: EngineInterface) {
+  const limits = (await $.session.usage()).rateLimits
+  const five = fiveHourOf(limits)
+  await changeRun($, run => ({ ...run, percent: five?.percent ?? null, resetsAt: five?.resetsAt ?? null }))
+
+  return { limits, five }
+}
+
+/** Keeps this session's pause in the store for a restart, or drops it once there is none. */
+async function keepPause($: EngineInterface, run: GuardRun): Promise<void> {
+  const id = await $.session.id()
+  const now = await $.clock.now()
+  const pauses: Record<string, KeptPause> = {}
+  for (const [other, kept] of Object.entries(keptPauses(await $.store.get(PAUSES)))) {
+    if (other !== id && (kept.resetsAt ?? now) + PAUSE_STALE_MS > now) pauses[other] = kept
+  }
+  if (run.phase === 'paused' || run.phase === 'resumeFailed') {
+    const { resetsAt, isWeekly, resumeAt, resumeTries } = run
+    pauses[id] = { phase: run.phase, resetsAt, isWeekly, resumeAt, resumeTries }
+  }
+  await $.store.set(PAUSES, pauses)
+}
+
+/** After the main conversation's reply: at the threshold Claude is asked to wrap up, at 99% its tools are refused. */
+async function watchUsage($: EngineInterface): Promise<void> {
+  const settings = await read($, guard)
+  if (!settings.isOn) return
+  const { five } = await readUsage($)
+  const run = await read($, guardRun)
+  if (five === null || (await $.clock.now()) < run.skipUntil) return
+  const isHard = five.percent >= HARD_PERCENT
+  if (run.phase === 'watching' && five.percent >= settings.threshold) {
+    await changeRun($, r => ({ ...r, phase: isHard ? 'blocking' : 'wrapping', toolsUsed: 0, denied: 0 }))
+  } else if (run.phase === 'wrapping' && isHard) {
+    await changeRun($, r => ({ ...r, phase: 'blocking' }))
+  }
+}
+
+/** The wrapped-up turn has ended: paused until the reset, with a continue planned when Claude Code's setting asks for one. */
+async function startPause($: EngineInterface): Promise<void> {
+  const { limits, five } = await readUsage($)
+  const autoContinue = await readAutoContinue($)
+  const isWeekly = isWeeklyFull(limits)
+  const resetsAt = five?.resetsAt ?? null
+  const resumeAt = autoContinue === true && !isWeekly && resetsAt !== null ? resetsAt + RESUME_DELAY_MS : null
+  const run = await changeRun($, r => ({ ...r, phase: 'paused', autoContinue, isWeekly, resumeAt, resumeTries: 0, isResuming: false }))
+  await keepPause($, run)
+}
+
+async function endPause($: EngineInterface): Promise<void> {
+  resumeTurnId = null
+  const run = await changeRun($, r => ({ ...r, phase: 'watching', toolsUsed: 0, denied: 0, resumeAt: null, resumeTries: 0, isResuming: false }))
+  await keepPause($, run)
+}
+
+/** Sends the continue prompt; the turn it starts says at its end whether it went through. */
+async function resume($: EngineInterface): Promise<void> {
+  resumeTurnId = null
+  await changeRun($, r => ({ ...r, phase: 'paused', isResuming: true, resumeTries: r.resumeTries + 1 }))
+  const w = limitWords(MESSAGES[await langOf($)].tag)
+  try {
+    await $.prompt.submit({ text: w.resumePrompt })
+  } catch {
+    await retryResume($)
+  }
+}
+
+/** A continue that was refused is tried again: first soon, then once a minute, until it gives up. */
+async function retryResume($: EngineInterface): Promise<void> {
+  resumeTurnId = null
+  const now = await $.clock.now()
+  const run = await changeRun($, r =>
+    r.resumeTries > MAX_RESUME_RETRIES
+      ? { ...r, phase: 'resumeFailed', isResuming: false, resumeAt: null }
+      : { ...r, isResuming: false, resumeAt: now + resumeRetryMs(r.resumeTries) },
+  )
+  await keepPause($, run)
+}
+
+/** The main conversation's turn has ended: a wrapped-up turn pauses, and the continue's own turn settles the pause. */
+async function settleTurn($: EngineInterface, turnId: string, reason: string): Promise<void> {
+  const run = await read($, guardRun)
+  if (run.phase === 'wrapping' || run.phase === 'blocking') {
+    await startPause($)
+    return
+  }
+  if (!run.isResuming || turnId !== resumeTurnId) return
+  // An API error is the limit refusing it still; an answer, or the person stopping it, ends the pause.
+  if (reason === 'error') await retryResume($)
+  else await endPause($)
+}
+
+/** Takes Claude Code's continue setting as changed, planning or dropping a paused session's continue with it. */
+async function applyAutoContinue($: EngineInterface, value: boolean): Promise<void> {
+  const run = await changeRun($, r => {
+    if (r.phase !== 'paused' || r.isResuming) return { ...r, autoContinue: value }
+    const resumeAt = value && !r.isWeekly && r.resetsAt !== null ? r.resetsAt + RESUME_DELAY_MS : null
+
+    return { ...r, autoContinue: value, resumeAt }
+  })
+  if (run.phase === 'paused') await keepPause($, run)
+}
+
+/** On a start or a reload: the guard's settings, and a pause this session left, planned again. */
+async function restoreGuard($: EngineInterface): Promise<void> {
+  const settings = keptGuard(await $.store.get(GUARD))
+  await update($, guard, () => settings)
+  if (!settings.isOn) return
+  const autoContinue = await readAutoContinue($)
+  const kept = keptPauses(await $.store.get(PAUSES))[await $.session.id()]
+  // A reload keeps the session's state but not the turn a continue started: it is planned again from now.
+  await changeRun($, r => {
+    const isPaused = r.phase === 'paused' || r.phase === 'resumeFailed'
+    if (kept === undefined || isPaused) return { ...r, autoContinue, isResuming: false }
+
+    return { ...r, ...kept, autoContinue, isResuming: false }
+  })
+}
+
+/** Each second: a continue that is due goes out, and a usage limit that has reset stops being shown. */
+async function tickGuard($: EngineInterface, now: number): Promise<void> {
+  const run = await read($, guardRun)
+  if (run.limit !== null && run.limit.reset !== null && now >= run.limit.reset) {
+    await changeRun($, r => ({ ...r, limit: null }))
+  }
+  if (run.phase === 'paused' && run.resumeAt !== null && !run.isResuming && now >= run.resumeAt) await resume($)
+}
+
 async function viewOf($: EngineInterface): Promise<View> {
   return {
     held: await read($, snap),
@@ -491,6 +681,7 @@ async function recordStep(
 
   // A reply went through, so whatever held automatic refreshes back no longer does.
   autoHeldUntil = 0
+  if ((await read($, guardRun)).limit !== null) await changeRun($, r => ({ ...r, limit: null }))
   // Noted before the write: the redraw the write causes must already find it.
   const at = await $.clock.now()
   refill = { at, from: shareLeft(previous, at) }
@@ -611,6 +802,7 @@ export const register: Register = on => {
     if (kept !== null) await update($, auto, () => kept)
     // Held with the switch as restored. A session that ended without saying so (a crash, a kill) leaves its hold behind until it goes stale.
     void holdIdleCompaction($, (await read($, auto)).isOn)
+    await restoreGuard($)
     $.clock.every(1000, async () => {
       const lang = await langOf($)
       const m = MESSAGES[lang]
@@ -624,6 +816,7 @@ export const register: Register = on => {
       }
       const held = await read($, snap)
       const now = await $.clock.now()
+      await tickGuard($, now)
       // The countdown: redraw only when its words change.
       const head = held === null ? '' : remainingOf(held, now) > 0 ? fmtRemaining(remainingOf(held, now)) : 'cold'
       if (head !== lastHead) {
@@ -642,23 +835,25 @@ export const register: Register = on => {
       const budget = budgetOf(held, policy.cap, await knownExtension($))
       if (held.pingsSinceTurn >= budget || now < autoHeldUntil) return
       const w = limitWords(m.tag)
-      const holdForLimit = (limits: Parameters<typeof blockingReset>[0]): string => {
+      const holdForLimit = async (limits: Parameters<typeof blockingReset>[0]): Promise<string> => {
         const reset = blockingReset(limits)
         autoHeldUntil = reset ?? Infinity
+        // The panel and the band say so until the reset, or the next reply.
+        await changeRun($, r => ({ ...r, limit: { reset } }))
 
         return reset === null ? w.heldNoReset : w.heldUntil(fmtClock(reset))
       }
       // A plan window already used up refuses the request: wait for its reset instead of sending one.
       const before = (await $.session.usage()).rateLimits
       if (isPastLimit(before)) {
-        $.ui.log(holdForLimit(before))
+        $.ui.log(await holdForLimit(before))
         return
       }
       const sent = await ping($, false)
       const line = m.autoLog(held.pingsSinceTurn + 1, budget, sent.text)
       if (sent.failure === 'limit') {
         // Refused for the usage limit: it refreshed nothing, so it spends none of the budget.
-        $.ui.log(`${line} ${holdForLimit((await $.session.usage()).rateLimits)}`)
+        $.ui.log(`${line} ${await holdForLimit((await $.session.usage()).rateLimits)}`)
         return
       }
       if (sent.failure === 'other') {
@@ -718,12 +913,64 @@ export const register: Register = on => {
       if (isMain && pingAt === null && result.usage !== null) {
         await hear($, result.answer)
         await recordStep($, startedAt, e.index, result.usage)
+        await watchUsage($)
       }
 
       return result
     } finally {
       if (isMain) inFlight -= 1
     }
+  })
+
+  on('turn.start', async ($, e, next) => {
+    if (e.agentId === undefined) {
+      mainTurnId = e.turnId
+      if ((await read($, guardRun)).isResuming && resumeTurnId === null) resumeTurnId = e.turnId
+    }
+
+    return next(e)
+  })
+
+  on('turn.complete', async ($, e, next) => {
+    const result = await next(e)
+    if (e.agentId === undefined) await settleTurn($, e.turnId, e.reason)
+
+    return result
+  })
+
+  // Wrapping up: each tool still runs, its result carrying a reminder only Claude reads, until the grace is
+  // used or the usage reaches 99%. Then every call is refused, and the third refusal ends the turn.
+  on('tool.call', async ($, e, next) => {
+    const run = await read($, guardRun)
+    if (run.phase !== 'wrapping' && run.phase !== 'blocking') return next(e)
+    if (run.phase === 'wrapping' && run.toolsUsed < GRACE_TOOLS) {
+      await changeRun($, r => ({ ...r, toolsUsed: r.toolsUsed + 1 }))
+      const result = await next(e)
+      // A subagent's tools count against the grace, but only the main conversation is asked to stop.
+      if (result.deny !== undefined || e.agentId !== undefined) return result
+
+      return { ...result, context: [...(result.context ?? []), WRAP_UP_REMINDER] }
+    }
+    const { denied } = await changeRun($, r => ({ ...r, phase: 'blocking', denied: r.denied + 1 }))
+    if (denied >= ABORT_AFTER_DENIED && mainTurnId !== null) await $.turn.abort({ turnId: mainTurnId })
+
+    return { deny: limitWords(MESSAGES[await langOf($)].tag).denied }
+  })
+
+  on('prompt.submit', async ($, e, next) => {
+    if (PERSON_KINDS.includes(e.origin.kind)) {
+      const { phase } = await read($, guardRun)
+      if (phase === 'paused' || phase === 'resumeFailed') await endPause($)
+    }
+
+    return next(e)
+  })
+
+  on('config.set', { key: 'autoContinueAtUsageLimit' }, async ($, e, next) => {
+    const result = await next(e)
+    if (result.deny === undefined && typeof result.value === 'boolean') await applyAutoContinue($, result.value)
+
+    return result
   })
 
   on('classic.SessionStart', async ($, e, next) => {
@@ -824,7 +1071,7 @@ export const register: Register = on => {
     const els = $.ui.resolve(e)
     const band = bandView(els, e.surface, m, view, await motionOf($), () => {
       void openPane($, m.paneTitle)
-    }, await contextPartOf($, m.tag, e.props.isWorking))
+    }, await contextPartOf($, m.tag, e.props.isWorking), { settings: await read($, guard), run: await read($, guardRun) })
 
     return els.Box({ flexDirection: 'column', children: [beneath, band] })
   })
@@ -849,6 +1096,50 @@ export const register: Register = on => {
         lastAction = (await ping($, false)).text
         $.ui.invalidate('ui.render')
       },
-    }, e.props.bodyColumns, await motionOf($), ctx)
+    }, e.props.bodyColumns, await motionOf($), ctx, {
+      settings: await read($, guard),
+      run: await read($, guardRun),
+      onToggle: async () => {
+        const settings = await setGuard($, held => ({ ...held, isOn: !held.isOn }))
+        if (!settings.isOn) {
+          await endPause($)
+          return
+        }
+        const autoContinue = await readAutoContinue($)
+        await changeRun($, r => ({ ...r, autoContinue }))
+        await readUsage($)
+      },
+      onThresholdDown: () => {
+        void setGuard($, held => ({ ...held, threshold: Math.max(MIN_THRESHOLD, held.threshold - 1) }))
+      },
+      onThresholdUp: () => {
+        void setGuard($, held => ({ ...held, threshold: Math.min(MAX_THRESHOLD, held.threshold + 1) }))
+      },
+      onAutoContinue: async () => {
+        const now = (await read($, guardRun)).autoContinue
+        if (now === null) return
+        // The key is written out as fixed text: the plugin directory accepts a settings write only so.
+        const written = await $.config.set({ key: 'autoContinueAtUsageLimit', value: !now })
+        if (written.deny !== undefined) $.ui.toast(written.deny)
+        else await applyAutoContinue($, !now)
+      },
+      onStop: async () => {
+        if (mainTurnId === null) return
+        await changeRun($, r => ({ ...r, phase: 'blocking' }))
+        await $.turn.abort({ turnId: mainTurnId })
+      },
+      onSkip: async () => {
+        const now = await $.clock.now()
+        const run = await changeRun($, r => ({ ...r, phase: 'watching', toolsUsed: 0, denied: 0, skipUntil: r.resetsAt ?? now + FIVE_HOURS_MS }))
+        await keepPause($, run)
+      },
+      onResume: async () => {
+        await changeRun($, r => ({ ...r, resumeTries: 0 }))
+        await resume($)
+      },
+      onCancelResume: async () => {
+        await keepPause($, await changeRun($, r => ({ ...r, resumeAt: null })))
+      },
+    })
   })
 }

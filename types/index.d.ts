@@ -75,6 +75,42 @@ export type ContextLists = {
 
 export type ContextListKey = 'mcp' | 'memory' | 'agents'
 
+/** The usage guard's settings, kept in the store: off until the person turns it on. */
+export type Guard = {
+  isOn: boolean
+  /** The five-hour usage, in percent, at which Claude is asked to wrap up. */
+  threshold: number
+}
+
+/**
+ * Where the usage guard stands in this session: watching the five-hour usage, letting Claude wrap up,
+ * refusing tools, paused until the reset, or paused after the automatic continue gave up.
+ */
+export type GuardPhase = 'watching' | 'wrapping' | 'blocking' | 'paused' | 'resumeFailed'
+
+export type GuardRun = {
+  phase: GuardPhase
+  /** The five-hour window's use, in percent, and its reset in ms since the epoch, as last read. */
+  percent: number | null
+  resetsAt: number | null
+  /** Whether the seven-day window was used up when the pause began: no automatic continue then. */
+  isWeekly: boolean
+  /** Tools the main conversation used since wrapping up began, and calls refused since refusing began. */
+  toolsUsed: number
+  denied: number
+  /** "Not this time": the guard stays quiet until this moment, the window's reset. */
+  skipUntil: number
+  /** When the automatic continue goes out; null when none is planned. */
+  resumeAt: number | null
+  /** Continue prompts sent for this pause, and whether one is under way. */
+  resumeTries: number
+  isResuming: boolean
+  /** A refresh was refused at the usage limit: refreshing waits for this reset (null when none was given). */
+  limit: { reset: number | null } | null
+  /** Claude Code's own "continue at the usage-limit reset" setting, as last read; null where it has none. */
+  autoContinue: boolean | null
+}
+
 declare module 'claude-code' {
   interface PluginState {
     'cache-context': {
@@ -84,6 +120,8 @@ declare module 'claude-code' {
       isCompacting: boolean
       isLegendOpen: boolean
       openLists: ContextListKey[]
+      guard: Guard
+      guardRun: GuardRun
     }
   }
 }
