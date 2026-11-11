@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
 import type { ContextAgent, EngineInterface, ModelUsage, Register, SessionContextBreakdown } from 'claude-code'
 
-import type { ContextFile, ContextLists, ContextListKey, ContextMeter, Snapshot, Ttl } from '../types'
+import type { Auto, ContextFile, ContextLists, ContextListKey, ContextMeter, Snapshot, Ttl } from '../types'
 import { contextWords } from './context'
 import type { ContextWords } from './context'
 import { detect, follow } from './detect'
@@ -58,6 +58,8 @@ const HOLDERS = 'idleCompactionHolders'
 // A session renews its hold this often; one not heard from for longer than the stale age has ended without saying so.
 const HOLD_BEAT_MS = 60_000
 const HOLD_STALE_MS = 5 * 60_000
+// The auto-refresh switch and its limit as last chosen, kept across restarts.
+const AUTO = 'auto'
 
 type TtlChoice = Pick<Snapshot, 'ttl' | 'ttlSource'>
 
@@ -231,6 +233,17 @@ async function learnExtension($: EngineInterface, ttl: Ttl, doesExtend: boolean)
   await $.store.set(EXTENDS, extension)
 }
 
+/** The auto-refresh setting the store kept; null when none was kept or the value is not one. */
+function keptAuto(held: unknown): Auto | null {
+  if (typeof held !== 'object' || held === null) return null
+  const { isOn, cap } = held as Record<string, unknown>
+  if (typeof isOn !== 'boolean' || typeof cap !== 'number' || !Number.isInteger(cap) || cap < 1 || cap > MAX_CAP) {
+    return null
+  }
+
+  return { isOn, cap }
+}
+
 // Idle compaction runs at 90% of a one-hour cache's lifetime, before an auto-refresh would go out, so it is off while any session has auto-refresh on.
 // Only a setting this mod turned off is turned back on; one that was off already stays off.
 function holdIdleCompaction($: EngineInterface, isAutoOn: boolean, sessionId?: string): Promise<'paused' | 'restored' | null> {
@@ -279,8 +292,11 @@ async function changeHold($: EngineInterface, isAutoOn: boolean, sessionId?: str
   }
 }
 
-async function setAuto($: EngineInterface, change: (held: { isOn: boolean; cap: number }) => { isOn: boolean; cap: number }): Promise<string | null> {
+// The person's own change: kept in the store too, since the session's state starts over when Claude Code restarts or updates.
+// A session ending turns its own switch off with `update` alone, so what was chosen still comes back next time.
+async function setAuto($: EngineInterface, change: (held: Auto) => Auto): Promise<string | null> {
   const held = await update($, auto, change)
+  await $.store.set(AUTO, held)
   const outcome = await holdIdleCompaction($, held.isOn)
   if (outcome === null) return null
   const m = MESSAGES[await langOf($)]
@@ -590,7 +606,10 @@ async function ping($: EngineInterface, isForced: boolean): Promise<PingResult> 
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     isHeadless = !e.isInteractive
-    // A session that ended without saying so (a crash, a kill) leaves its hold behind until it goes stale.
+    // The session's state starts over when Claude Code restarts or updates, so the switch comes back from the store.
+    const kept = keptAuto(await $.store.get(AUTO))
+    if (kept !== null) await update($, auto, () => kept)
+    // Held with the switch as restored. A session that ended without saying so (a crash, a kill) leaves its hold behind until it goes stale.
     void holdIdleCompaction($, (await read($, auto)).isOn)
     $.clock.every(1000, async () => {
       const lang = await langOf($)
@@ -821,10 +840,10 @@ export const register: Register = on => {
         if (idle !== null) $.ui.toast(idle)
       },
       onCapDown: () => {
-        void update($, auto, held => ({ ...held, cap: Math.max(1, held.cap - 1) }))
+        void setAuto($, held => ({ ...held, cap: Math.max(1, held.cap - 1) }))
       },
       onCapUp: () => {
-        void update($, auto, held => ({ ...held, cap: Math.min(MAX_CAP, held.cap + 1) }))
+        void setAuto($, held => ({ ...held, cap: Math.min(MAX_CAP, held.cap + 1) }))
       },
       onPing: async () => {
         lastAction = (await ping($, false)).text

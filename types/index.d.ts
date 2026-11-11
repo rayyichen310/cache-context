@@ -30,7 +30,7 @@ export type Snapshot = {
   lastPing: PingUsage | null
 }
 
-/** The auto keep-alive switch, per session: off until the person turns it on. */
+/** The auto keep-alive switch: off until the person turns it on, then kept in the store across restarts. */
 export type Auto = {
   isOn: boolean
   /** The most pings one idle stretch may spend, before the break-even count lowers it. */
