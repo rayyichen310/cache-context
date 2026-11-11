@@ -40,6 +40,8 @@ export const om: Messages = {
   pingMissed: (counts, cost) => `Cache hin argamne: ${counts}.${cost} Yeroon cache hin dheeranne.`,
   autoLog: (n, budget, text) => `Ofumaan dheeressuu ${n}/${budget}. ${text}`,
   autoMissToast: 'Ofumaan dheeressuun hin milkoofne. /cache-status ilaali',
+  idlePaused: 'Yeroo ofumaan dheeressuun banaa jirutti cuunfaan yeroo boqonnaa dhaameera, akka haasaan dheeraan osoo hin dheeratin hin cuunfamneef. Yeroo ofumaan dheeressuun dhaamu deebi\'ee bana.',
+  idleRestored: 'Cuunfaan yeroo boqonnaa deebi\'ee baneera.',
   reportNothing: 'Cache prompt: ammallee cache hin jiru. Lakkoofsi yeroo deebii itti aanu booda jalqaba.',
   reportWarm: left => `Cache prompt: ni hojjeta, ${spanOm(left)} hafe.`,
   reportCold: why => `Cache prompt: hin hojjetu (${why}).`,

@@ -42,6 +42,8 @@ export const fi: Messages = {
   pingMissed: (counts, cost) => `Välimuistihuti: ${counts}.${cost} Välimuistin voimassaoloaikaa ei pidennetty.`,
   autoLog: (n, budget, text) => `Automaattinen uusiminen ${n}/${budget}. ${text}`,
   autoMissToast: 'Automaattinen uusiminen epäonnistui. Katso /cache-status',
+  idlePaused: 'Tiivistys tauon aikana on pois päältä automaattisen uusimisen ajan, jotta pitkää keskustelua ei tiivistetä ennen uusimista. Se palaa päälle, kun automaattinen uusiminen kytketään pois.',
+  idleRestored: 'Tiivistys tauon aikana on taas päällä.',
   reportNothing: 'Kehotteiden välimuisti: vielä tyhjä. Ajastin käynnistyy seuraavan vastauksen jälkeen.',
   reportWarm: left => `Kehotteiden välimuisti: voimassa, jäljellä ${spanFi(left)}.`,
   reportCold: why => `Kehotteiden välimuisti: ei voimassa (${why}).`,

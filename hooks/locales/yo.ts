@@ -40,6 +40,8 @@ export const yo: Messages = {
   pingMissed: (counts, cost) => `A kò rí cache: ${counts}.${cost} A kò fikún àkókò cache.`,
   autoLog: (n, budget, text) => `Àfikún àkókò aládàáṣiṣẹ́ ${n}/${budget}. ${text}`,
   autoMissToast: 'Àfikún àkókò aládàáṣiṣẹ́ kò ṣàṣeyọrí. Ẹ wo /cache-status',
+  idlePaused: 'A ti pa ìfúnpọ̀ àsìkò ìsinmi nígbà tí àfikún àkókò aládàáṣiṣẹ́ wà ní títàn, kí ìjíròrò gígùn má baà di fífúnpọ̀ ṣáájú àfikún. Yóò padà tàn nígbà tí a bá pa àfikún àkókò aládàáṣiṣẹ́.',
+  idleRestored: 'A ti tún tan ìfúnpọ̀ àsìkò ìsinmi.',
   reportNothing: 'Cache ti prompt: kò tíì sí cache. Kíkà àkókò yóò bẹ̀rẹ̀ lẹ́yìn ìdáhùn tó kàn.',
   reportWarm: left => `Cache ti prompt: ó ń ṣiṣẹ́, ${spanYo(left)} ló kù.`,
   reportCold: why => `Cache ti prompt: kò ṣiṣẹ́ (${why}).`,

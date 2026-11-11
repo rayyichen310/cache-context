@@ -44,6 +44,8 @@ export const bho: Messages = {
   pingMissed: (counts, cost) => `Cache miss: ${counts}।${cost} Cache के मियाद ना बढ़ल।`,
   autoLog: (n, budget, text) => `Auto-refresh ${n}/${budget}। ${text}`,
   autoMissToast: 'Auto-refresh सफल ना भइल। /cache-status देखीं',
+  idlePaused: 'Auto-refresh चालू रहे तक idle compaction बंद बा, ताकि लमहर बातचीत refresh से पहिले compact ना होखे। Auto-refresh बंद भइला पर ई फेर चालू हो जाई।',
+  idleRestored: 'Idle compaction फेर से चालू बा।',
 
   reportNothing: 'Prompt cache: अभी ले cache नइखे। अगिला जवाब के बाद उलटी गिनती शुरू होई।',
   reportWarm: left => `Prompt cache: सक्रिय बा, ${spanBho(left)} बाकी।`,

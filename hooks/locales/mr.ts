@@ -44,6 +44,8 @@ export const mr: Messages = {
   pingMissed: (counts, cost) => `Cache miss: ${counts}.${cost} Cache ची मुदत वाढली नाही.`,
   autoLog: (n, budget, text) => `Auto-refresh ${n}/${budget}. ${text}`,
   autoMissToast: 'Auto-refresh यशस्वी झाला नाही. /cache-status पाहा',
+  idlePaused: 'Auto-refresh चालू असेपर्यंत idle compaction बंद आहे, म्हणजे लांब संभाषण refresh आधी compact होणार नाही. Auto-refresh बंद केल्यावर ते पुन्हा चालू होईल.',
+  idleRestored: 'Idle compaction पुन्हा चालू झाले.',
 
   reportNothing: 'Prompt cache: अजून cache नाही. पुढील उत्तरानंतर उलटगणना सुरू होईल.',
   reportWarm: left => `Prompt cache: सक्रिय, ${spanMr(left)} बाकी.`,

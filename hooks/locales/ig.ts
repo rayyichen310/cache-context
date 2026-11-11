@@ -40,6 +40,8 @@ export const ig: Messages = {
   pingMissed: (counts, cost) => `Ahụghị cache: ${counts}.${cost} Agbatịghị oge cache.`,
   autoLog: (n, budget, text) => `Ịgbatị oge n’onwe ya ${n}/${budget}. ${text}`,
   autoMissToast: 'Ịgbatị oge n’onwe ya agaghị nke ọma. Lee /cache-status',
+  idlePaused: 'Agbanyụrụ mkpakọ mgbe a na-ezu ike ka ịgbatị oge n’onwe ya na-agba, ka a ghara ịkpakọ mkparịta ụka ogologo tupu a gbatịa ya. Ọ ga-alaghachi mgbe a gbanyụrụ ịgbatị oge n’onwe ya.',
+  idleRestored: 'Agbanyela mkpakọ mgbe a na-ezu ike ọzọ.',
   reportNothing: 'Cache nke prompt: enweghị cache ugbu a. Ngụkọ oge ga-amalite mgbe azịza ọzọ gasịrị.',
   reportWarm: left => `Cache nke prompt: na-arụ ọrụ, ${spanIg(left)} fọdụrụ.`,
   reportCold: why => `Cache nke prompt: anaghị arụ ọrụ (${why}).`,

@@ -44,6 +44,8 @@ export const gu: Messages = {
   pingMissed: (counts, cost) => `Cache miss: ${counts}.${cost} Cache ની મુદત લંબાઈ નથી.`,
   autoLog: (n, budget, text) => `Auto-refresh ${n}/${budget}. ${text}`,
   autoMissToast: 'Auto-refresh સફળ થયો નથી. /cache-status જુઓ',
+  idlePaused: 'Auto-refresh ચાલુ હોય ત્યાં સુધી idle compaction બંધ છે, જેથી લાંબી વાતચીત refresh પહેલાં compact ન થાય. Auto-refresh બંધ થતાં તે ફરી ચાલુ થશે.',
+  idleRestored: 'Idle compaction ફરી ચાલુ છે.',
 
   reportNothing: 'Prompt cache: હજી કોઈ cache નથી. આગલા જવાબ પછી કાઉન્ટડાઉન શરૂ થશે.',
   reportWarm: left => `Prompt cache: સક્રિય, ${spanGu(left)} બાકી.`,

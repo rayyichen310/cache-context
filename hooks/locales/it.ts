@@ -41,6 +41,8 @@ export const it: Messages = {
   pingMissed: (counts, cost) => `Cache miss: ${counts}.${cost} La durata della cache non è stata estesa.`,
   autoLog: (n, budget, text) => `Rinnovo auto ${n}/${budget}. ${text}`,
   autoMissToast: 'Il rinnovo automatico non è riuscito. Vedi /cache-status',
+  idlePaused: 'La compattazione in inattività è disattivata mentre il rinnovo automatico è attivo, così una conversazione lunga non viene compattata prima del rinnovo. Si riattiva quando il rinnovo automatico si spegne.',
+  idleRestored: 'La compattazione in inattività è di nuovo attiva.',
   reportNothing: 'Cache dei prompt: ancora vuota. Il conto alla rovescia parte dopo la prossima risposta.',
   reportWarm: left => `Cache dei prompt: attiva, tempo rimasto: ${spanIt(left)}.`,
   reportCold: why => `Cache dei prompt: non attiva (${why}).`,

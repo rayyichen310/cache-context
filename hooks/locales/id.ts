@@ -41,6 +41,8 @@ export const id: Messages = {
   pingMissed: (counts, cost) => `Cache miss: ${counts}.${cost} Masa aktif cache tidak diperpanjang.`,
   autoLog: (n, budget, text) => `Perpanjangan otomatis ${n}/${budget}. ${text}`,
   autoMissToast: 'Perpanjangan otomatis gagal. Lihat /cache-status',
+  idlePaused: 'Pemadatan saat diam dimatikan selama perpanjangan otomatis aktif, agar percakapan panjang tidak dipadatkan sebelum diperpanjang. Akan aktif lagi saat perpanjangan otomatis dimatikan.',
+  idleRestored: 'Pemadatan saat diam aktif lagi.',
   reportNothing: 'Cache prompt: belum ada cache. Hitung mundur dimulai setelah balasan berikutnya.',
   reportWarm: left => `Cache prompt: aktif, tersisa ${spanId(left)}.`,
   reportCold: why => `Cache prompt: tidak aktif (${why}).`,

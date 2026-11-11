@@ -44,6 +44,8 @@ export const te: Messages = {
   pingMissed: (counts, cost) => `Cache miss: ${counts}.${cost} Cache గడువు పొడిగించబడలేదు.`,
   autoLog: (n, budget, text) => `Auto-refresh ${n}/${budget}. ${text}`,
   autoMissToast: 'Auto-refresh విజయవంతం కాలేదు. /cache-status చూడండి',
+  idlePaused: 'Auto-refresh ఆన్‌లో ఉన్నంతవరకు idle compaction ఆఫ్‌లో ఉంది, కాబట్టి పెద్ద సంభాషణ refresh కి ముందు compact కాదు. Auto-refresh ఆఫ్ చేసినప్పుడు ఇది మళ్లీ ఆన్ అవుతుంది.',
+  idleRestored: 'Idle compaction మళ్లీ ఆన్ అయింది.',
 
   reportNothing: 'Prompt cache: ఇంకా cache లేదు. తర్వాతి సమాధానం వచ్చాక కౌంట్‌డౌన్ మొదలవుతుంది.',
   reportWarm: left => `Prompt cache: సక్రియంగా ఉంది, ${spanTe(left)} మిగిలింది.`,

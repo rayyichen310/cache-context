@@ -40,6 +40,8 @@ export const ny: Messages = {
   pingMissed: (counts, cost) => `Cache sinapezeke: ${counts}.${cost} Nthawi ya cache sinawonjezedwe.`,
   autoLog: (n, budget, text) => `Kuwonjezera nthawi kokha ${n}/${budget}. ${text}`,
   autoMissToast: 'Kuwonjezera nthawi kokha sikunachite bwino. Onani /cache-status',
+  idlePaused: 'Kufupikitsa nthawi yopuma kwazimitsidwa pamene kuwonjezera nthawi kokha kuli koyaka, kuti zokambirana zazitali zisafupikitsidwe zisanawonjezeredwe. Kudzayakanso mukazimitsa kuwonjezera nthawi kokha.',
+  idleRestored: 'Kufupikitsa nthawi yopuma kwayakanso.',
   reportNothing: 'Cache ya prompt: palibe cache panobe. Kuwerengera nthawi kuyamba pambuyo pa yankho lotsatira.',
   reportWarm: left => `Cache ya prompt: ikugwira ntchito, kwatsala ${spanNy(left)}.`,
   reportCold: why => `Cache ya prompt: sikugwira ntchito (${why}).`,

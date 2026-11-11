@@ -1098,3 +1098,90 @@ test('an unpriced cache keeps its figure and ring without the costs drawing', { 
   expect(await pane.find({ type: 'Text', text: 'Pricing unavailable for this model' })).toBeDefined()
   await pane.unmount()
 })
+
+// A /config with an Idle compaction row, and the writes the mod makes to it.
+function idleConfig(on: any, initial = true) {
+  const config = { idle: initial, written: [] as boolean[] }
+  on('config.list', () => ({
+    value: [{ key: 'idleCompaction', label: 'Idle compaction', kind: 'boolean', value: config.idle, provider: { plugin: 'engine', tier: 'core' }, isLocked: false }],
+  }))
+  on('config.set', (_: unknown, e: { key: string; value: boolean }) => {
+    if (e.key !== 'idleCompaction') return { deny: `unexpected key ${e.key}` }
+    config.idle = e.value
+    config.written.push(e.value)
+
+    return { value: e.value }
+  })
+  on('session.id', () => ({ value: 'session-a' }))
+  on('session.end', (_: unknown, e: { sessionId: string }) => ({ sessionId: e.sessionId }))
+
+  return config
+}
+
+test('auto-refresh turns idle compaction off while it is on, and only what it turned off back on', async ($, on) => {
+  mock.clock(on, { now: START })
+  mock.store(on)
+  mock.env(on, {})
+  const config = idleConfig(on)
+  await boot($, on)
+
+  const enabled = await $.command.run({ command: 'cache-auto', args: 'on' })
+  expect(enabled.text).toContain('Idle compaction is off while auto-refresh is on')
+  expect(config.idle).toBe(false)
+  // Changing the limit changes nothing more.
+  await $.command.run({ command: 'cache-auto', args: '5' })
+  expect(config.written).toEqual([false])
+
+  const disabled = await $.command.run({ command: 'cache-auto', args: 'off' })
+  expect(disabled.text).toContain('Idle compaction is back on.')
+  expect(config.idle).toBe(true)
+
+  // A setting that was off already is left as it is.
+  config.idle = false
+  config.written.length = 0
+  await $.command.run({ command: 'cache-auto', args: 'on' })
+  await $.command.run({ command: 'cache-auto', args: 'off' })
+  expect(config.written).toEqual([])
+  expect(config.idle).toBe(false)
+})
+
+test('ending a conversation with auto-refresh on turns it off and idle compaction back on', async ($, on) => {
+  mock.clock(on, { now: START })
+  mock.store(on)
+  mock.env(on, {})
+  const config = idleConfig(on)
+  await boot($, on)
+  await $.command.run({ command: 'cache-auto', args: 'on' })
+  expect(config.idle).toBe(false)
+  await $.session.end({ reason: 'clear', sessionId: 'session-a' })
+  expect(config.idle).toBe(true)
+  // The next conversation starts with auto-refresh off.
+  expect((await $.command.run({ command: 'cache-auto', args: '' })).text).toContain('Auto-refresh: off')
+})
+
+test('idle compaction stays off while another session still has auto-refresh on', async ($, on) => {
+  const clock = mock.clock(on, { now: START })
+  // Session B turned it off a minute ago and is still running.
+  mock.store(on, { idleCompactionPaused: true, idleCompactionHolders: { 'session-b': START - MINUTE } })
+  mock.env(on, {})
+  const config = idleConfig(on, false)
+  await boot($, on)
+  await $.command.run({ command: 'cache-auto', args: 'on' })
+  await $.command.run({ command: 'cache-auto', args: 'off' })
+  expect(config.written).toEqual([])
+
+  // Once B has not been heard from for five minutes it is taken to have ended, and the setting comes back.
+  await clock.advance(5 * MINUTE)
+  await $.command.run({ command: 'cache-auto', args: 'off' })
+  expect(config.idle).toBe(true)
+})
+
+test('a session that crashed with auto-refresh on has idle compaction turned back on by the next one', async ($, on) => {
+  mock.clock(on, { now: START })
+  mock.store(on, { idleCompactionPaused: true, idleCompactionHolders: { 'session-b': START - 10 * MINUTE } })
+  mock.env(on, {})
+  const config = idleConfig(on, false)
+  await boot($, on)
+  await $.command.run({ command: 'cache-auto', args: '' })
+  expect(config.idle).toBe(true)
+})

@@ -41,6 +41,8 @@ export const fr: Messages = {
   pingMissed: (counts, cost) => `Échec de cache : ${counts}.${cost} La durée du cache n’a pas été prolongée.`,
   autoLog: (n, budget, text) => `Prolongation auto ${n}/${budget}. ${text}`,
   autoMissToast: 'La prolongation automatique a échoué. Voir /cache-status',
+  idlePaused: 'La compaction en veille est désactivée pendant la prolongation automatique, pour qu\'une longue conversation ne soit pas compactée avant d\'être prolongée. Elle se réactive quand la prolongation automatique s\'arrête.',
+  idleRestored: 'La compaction en veille est réactivée.',
   reportNothing: 'Cache de prompts : encore vide. Le compte à rebours démarre après la prochaine réponse.',
   reportWarm: left => `Cache de prompts : actif, reste ${spanFr(left)}.`,
   reportCold: why => `Cache de prompts : inactif (${why}).`,

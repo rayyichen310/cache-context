@@ -41,6 +41,8 @@ export const zhHant: Messages = {
   pingMissed: (counts, cost) => `快取未命中：${counts}。${cost}快取有效期未延長。`,
   autoLog: (n, budget, text) => `自動續期 ${n}/${budget}。${text}`,
   autoMissToast: '自動續期未成功，詳見 /cache-status',
+  idlePaused: '自動續期開啟期間已關閉閒置壓縮，長對話不會在續期前被壓縮。關閉自動續期時會恢復。',
+  idleRestored: '已恢復閒置壓縮。',
   reportNothing: '提示快取：尚無快取，下次回覆後開始倒數計時。',
   reportWarm: left => `提示快取：有效，剩餘 ${spanZhHant(left)}。`,
   reportCold: why => `提示快取：無效（${why}）。`,

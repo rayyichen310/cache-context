@@ -44,6 +44,8 @@ export const ta: Messages = {
   pingMissed: (counts, cost) => `Cache miss: ${counts}.${cost} Cache காலம் நீட்டிக்கப்படவில்லை.`,
   autoLog: (n, budget, text) => `Auto-refresh ${n}/${budget}. ${text}`,
   autoMissToast: 'Auto-refresh வெற்றிபெறவில்லை. /cache-status பார்க்கவும்',
+  idlePaused: 'Auto-refresh இயங்கும் வரை idle compaction அணைக்கப்பட்டுள்ளது, அதனால் நீண்ட உரையாடல் refresh-க்கு முன் compact ஆகாது. Auto-refresh அணைந்ததும் இது மீண்டும் இயங்கும்.',
+  idleRestored: 'Idle compaction மீண்டும் இயங்குகிறது.',
 
   reportNothing: 'Prompt cache: இன்னும் cache இல்லை. அடுத்த பதிலுக்குப் பிறகு கவுன்ட்டவுன் தொடங்கும்.',
   reportWarm: left => `Prompt cache: செயலில் உள்ளது, ${spanTa(left)} மீதம்.`,

@@ -40,6 +40,8 @@ export const so: Messages = {
   pingMissed: (counts, cost) => `Cache lama helin: ${counts}.${cost} Waqtiga cache lama kordhin.`,
   autoLog: (n, budget, text) => `Kordhin toos ah ${n}/${budget}. ${text}`,
   autoMissToast: 'Kordhinta tooska ahi ma guulaysan. Eeg /cache-status',
+  idlePaused: 'Isku-soo-koobidda waqtiga nasashada waa la damiyay inta kordhinta tooska ahi shidan tahay, si wada-hadal dheer aan loo soo koobin ka hor inta aan la kordhin. Way soo laabanaysaa marka kordhinta tooska ah la damiyo.',
+  idleRestored: 'Isku-soo-koobidda waqtiga nasashada mar kale waa la shiday.',
   reportNothing: 'Cache prompt: weli cache ma jiro. Tirinta waqtigu waxay bilaabataa jawaabta xigta ka dib.',
   reportWarm: left => `Cache prompt: wuu shaqaynayaa, ${spanSo(left)} ayaa haray.`,
   reportCold: why => `Cache prompt: ma shaqaynayo (${why}).`,

@@ -42,6 +42,8 @@ export const nl: Messages = {
   pingMissed: (counts, cost) => `Cache-miss: ${counts}.${cost} De cache is niet verlengd.`,
   autoLog: (n, budget, text) => `Automatisch verlengen ${n}/${budget}. ${text}`,
   autoMissToast: 'Automatisch verlengen mislukt. Zie /cache-status',
+  idlePaused: 'Comprimeren bij inactiviteit staat uit zolang automatisch verlengen aan staat, zodat een lang gesprek niet vóór het verlengen wordt gecomprimeerd. Het gaat weer aan als automatisch verlengen uitgaat.',
+  idleRestored: 'Comprimeren bij inactiviteit staat weer aan.',
   reportNothing: 'Promptcache: nog niets gecachet. De afteltimer start na het volgende antwoord.',
   reportWarm: left => `Promptcache: actief, nog ${spanNl(left)}.`,
   reportCold: why => `Promptcache: niet actief (${why}).`,

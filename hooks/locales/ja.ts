@@ -41,6 +41,8 @@ export const ja: Messages = {
   pingMissed: (counts, cost) => `キャッシュミス：${counts}。${cost}有効期間は延長されていません。`,
   autoLog: (n, budget, text) => `自動延長 ${n}/${budget}。${text}`,
   autoMissToast: '自動延長に失敗しました。/cache-status を確認してください',
+  idlePaused: '自動延長中はアイドル時の圧縮をオフにしました。長い会話が延長前に圧縮されません。自動延長をオフにすると元に戻ります。',
+  idleRestored: 'アイドル時の圧縮を元に戻しました。',
   reportNothing: 'プロンプトキャッシュ：まだありません。次の応答後にカウントダウンが始まります。',
   reportWarm: left => `プロンプトキャッシュ：有効、残り ${spanJa(left)}。`,
   reportCold: why => `プロンプトキャッシュ：無効（${why}）。`,

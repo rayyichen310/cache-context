@@ -41,6 +41,8 @@ export const ptBR: Messages = {
   pingMissed: (counts, cost) => `Falha de cache: ${counts}.${cost} A duração do cache não foi estendida.`,
   autoLog: (n, budget, text) => `Renovação auto. ${n}/${budget}. ${text}`,
   autoMissToast: 'A renovação automática não funcionou. Veja /cache-status',
+  idlePaused: 'A compactação ociosa fica desligada enquanto a renovação automática está ativa, para que uma conversa longa não seja compactada antes da renovação. Ela volta quando a renovação automática é desligada.',
+  idleRestored: 'A compactação ociosa foi religada.',
   reportNothing: 'Cache de prompts: ainda vazio. A contagem regressiva começa após a próxima resposta.',
   reportWarm: left => `Cache de prompts: ativo, tempo restante: ${spanPt(left)}.`,
   reportCold: why => `Cache de prompts: inativo (${why}).`,

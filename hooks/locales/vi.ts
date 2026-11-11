@@ -41,6 +41,8 @@ export const vi: Messages = {
   pingMissed: (counts, cost) => `Trượt bộ nhớ đệm: ${counts}.${cost} Bộ nhớ đệm chưa được gia hạn.`,
   autoLog: (n, budget, text) => `Tự động gia hạn ${n}/${budget}. ${text}`,
   autoMissToast: 'Tự động gia hạn thất bại. Xem /cache-status',
+  idlePaused: 'Đã tắt nén khi rảnh trong lúc tự động gia hạn đang bật, để cuộc trò chuyện dài không bị nén trước khi gia hạn. Sẽ bật lại khi tắt tự động gia hạn.',
+  idleRestored: 'Đã bật lại nén khi rảnh.',
   reportNothing: 'Bộ nhớ đệm prompt: chưa có dữ liệu. Bắt đầu đếm ngược sau phản hồi tiếp theo.',
   reportWarm: left => `Bộ nhớ đệm prompt: còn hiệu lực, còn ${spanVi(left)}.`,
   reportCold: why => `Bộ nhớ đệm prompt: không còn hiệu lực (${why}).`,

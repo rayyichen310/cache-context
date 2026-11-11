@@ -40,6 +40,8 @@ export const sw: Messages = {
   pingMissed: (counts, cost) => `Cache haikupatikana: ${counts}.${cost} Muda wa cache haukuongezwa.`,
   autoLog: (n, budget, text) => `Kuongeza muda kiotomatiki ${n}/${budget}. ${text}`,
   autoMissToast: 'Kuongeza muda kiotomatiki hakukufaulu. Angalia /cache-status',
+  idlePaused: 'Ubanaji wakati wa kutotumika umezimwa wakati kuongeza muda kiotomatiki kumewashwa, ili mazungumzo marefu yasibanwe kabla ya kuongezwa muda. Utawashwa tena kuongeza muda kiotomatiki kukizimwa.',
+  idleRestored: 'Ubanaji wakati wa kutotumika umewashwa tena.',
   reportNothing: 'Cache ya prompt: bado hakuna cache. Hesabu ya muda itaanza baada ya jibu lijalo.',
   reportWarm: left => `Cache ya prompt: inatumika, zimebaki ${spanSw(left)}.`,
   reportCold: why => `Cache ya prompt: haitumiki (${why}).`,

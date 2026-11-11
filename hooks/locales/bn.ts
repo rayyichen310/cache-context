@@ -44,6 +44,8 @@ export const bn: Messages = {
   pingMissed: (counts, cost) => `Cache miss: ${counts}।${cost} Cache-এর মেয়াদ বাড়েনি।`,
   autoLog: (n, budget, text) => `Auto-refresh ${n}/${budget}। ${text}`,
   autoMissToast: 'Auto-refresh সফল হয়নি। /cache-status দেখুন',
+  idlePaused: 'Auto-refresh চালু থাকা পর্যন্ত idle compaction বন্ধ, যাতে দীর্ঘ কথোপকথন refresh-এর আগে compact না হয়। Auto-refresh বন্ধ হলে এটি আবার চালু হবে।',
+  idleRestored: 'Idle compaction আবার চালু হয়েছে।',
 
   reportNothing: 'Prompt cache: এখনও কোনো cache নেই। পরের উত্তরের পরে কাউন্টডাউন শুরু হবে।',
   reportWarm: left => `Prompt cache: সক্রিয়, ${spanBn(left)} বাকি।`,

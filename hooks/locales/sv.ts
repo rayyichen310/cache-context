@@ -42,6 +42,8 @@ export const sv: Messages = {
   pingMissed: (counts, cost) => `Cachemiss: ${counts}.${cost} Cachens livslängd förlängdes inte.`,
   autoLog: (n, budget, text) => `Automatisk förnyelse ${n}/${budget}. ${text}`,
   autoMissToast: 'Automatisk förnyelse misslyckades. Se /cache-status',
+  idlePaused: 'Komprimering vid inaktivitet är avstängd medan automatisk förnyelse är på, så att en lång konversation inte komprimeras före förnyelsen. Den slås på igen när automatisk förnyelse stängs av.',
+  idleRestored: 'Komprimering vid inaktivitet är på igen.',
   reportNothing: 'Promptcache: inget cachat ännu. Nedräkningen startar efter nästa svar.',
   reportWarm: left => `Promptcache: aktiv, ${spanSv(left)} kvar.`,
   reportCold: why => `Promptcache: inte aktiv (${why}).`,

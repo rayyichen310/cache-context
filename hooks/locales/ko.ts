@@ -41,6 +41,8 @@ export const ko: Messages = {
   pingMissed: (counts, cost) => `캐시 미적중: ${counts}.${cost} 캐시 유효 시간이 연장되지 않았습니다.`,
   autoLog: (n, budget, text) => `자동 갱신 ${n}/${budget}. ${text}`,
   autoMissToast: '자동 갱신 실패. /cache-status를 확인하세요',
+  idlePaused: '자동 갱신 중에는 유휴 압축을 껐습니다. 긴 대화가 갱신 전에 압축되지 않습니다. 자동 갱신을 끄면 다시 켜집니다.',
+  idleRestored: '유휴 압축을 다시 켰습니다.',
   reportNothing: '프롬프트 캐시: 아직 캐시가 없습니다. 다음 응답 후 카운트다운이 시작됩니다.',
   reportWarm: left => `프롬프트 캐시: 활성, ${spanKo(left)} 남음.`,
   reportCold: why => `프롬프트 캐시: 비활성(${why}).`,

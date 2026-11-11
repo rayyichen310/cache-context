@@ -41,6 +41,8 @@ export const th: Messages = {
   pingMissed: (counts, cost) => `ไม่พบในแคช: ${counts}.${cost} ไม่ได้ต่ออายุแคช`,
   autoLog: (n, budget, text) => `ต่ออายุอัตโนมัติ ${n}/${budget} ${text}`,
   autoMissToast: 'ต่ออายุอัตโนมัติไม่สำเร็จ ดู /cache-status',
+  idlePaused: 'ปิดการบีบอัดขณะว่างไว้ระหว่างที่เปิดต่ออายุอัตโนมัติ เพื่อไม่ให้บทสนทนายาวถูกบีบอัดก่อนต่ออายุ จะเปิดกลับเมื่อปิดต่ออายุอัตโนมัติ',
+  idleRestored: 'เปิดการบีบอัดขณะว่างกลับแล้ว',
   reportNothing: 'แคชพรอมต์: ยังไม่มีแคช เริ่มนับถอยหลังหลังคำตอบถัดไป',
   reportWarm: left => `แคชพรอมต์: ใช้งานได้ เหลือ ${spanTh(left)}`,
   reportCold: why => `แคชพรอมต์: ใช้ไม่ได้ (${why})`,

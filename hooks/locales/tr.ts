@@ -41,6 +41,8 @@ export const tr: Messages = {
   pingMissed: (counts, cost) => `Önbellek ıskalaması: ${counts}.${cost} Önbelleğin süresi uzatılmadı.`,
   autoLog: (n, budget, text) => `Otomatik süre uzatma ${n}/${budget}. ${text}`,
   autoMissToast: 'Otomatik süre uzatma başarısız. Bkz. /cache-status',
+  idlePaused: 'Otomatik süre uzatma açıkken boşta sıkıştırma kapalı; böylece uzun bir konuşma uzatmadan önce sıkıştırılmaz. Otomatik süre uzatma kapanınca yeniden açılır.',
+  idleRestored: 'Boşta sıkıştırma yeniden açıldı.',
   reportNothing: 'İstem önbelleği: henüz veri yok. Geri sayım sonraki yanıttan sonra başlar.',
   reportWarm: left => `İstem önbelleği: etkin, kalan süre ${spanTr(left)}.`,
   reportCold: why => `İstem önbelleği: etkin değil (${why}).`,

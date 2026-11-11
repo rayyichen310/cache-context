@@ -44,6 +44,8 @@ export const kn: Messages = {
   pingMissed: (counts, cost) => `Cache miss: ${counts}.${cost} Cache ಅವಧಿ ವಿಸ್ತರಿಸಿಲ್ಲ.`,
   autoLog: (n, budget, text) => `Auto-refresh ${n}/${budget}. ${text}`,
   autoMissToast: 'Auto-refresh ಯಶಸ್ವಿಯಾಗಿಲ್ಲ. /cache-status ನೋಡಿ',
+  idlePaused: 'Auto-refresh ಆನ್ ಇರುವವರೆಗೆ idle compaction ಆಫ್ ಆಗಿದೆ, ಹೀಗಾಗಿ ದೀರ್ಘ ಸಂಭಾಷಣೆ refresh ಗೆ ಮೊದಲು compact ಆಗುವುದಿಲ್ಲ. Auto-refresh ಆಫ್ ಮಾಡಿದಾಗ ಇದು ಮತ್ತೆ ಆನ್ ಆಗುತ್ತದೆ.',
+  idleRestored: 'Idle compaction ಮತ್ತೆ ಆನ್ ಆಗಿದೆ.',
 
   reportNothing: 'Prompt cache: ಇನ್ನೂ cache ಇಲ್ಲ. ಮುಂದಿನ ಉತ್ತರದ ನಂತರ ಕೌಂಟ್‌ಡೌನ್ ಆರಂಭವಾಗುತ್ತದೆ.',
   reportWarm: left => `Prompt cache: ಸಕ್ರಿಯ, ${spanKn(left)} ಬಾಕಿ.`,

@@ -40,6 +40,8 @@ export const rw: Messages = {
   pingMissed: (counts, cost) => `Cache ntiyabonetse: ${counts}.${cost} Igihe cya cache nticyongerewe.`,
   autoLog: (n, budget, text) => `Kongera igihe byikora ${n}/${budget}. ${text}`,
   autoMissToast: 'Kongera igihe byikora ntibyashobotse. Reba /cache-status',
+  idlePaused: 'Guhina ikiganiro mu gihe cy’ikiruhuko byazimijwe igihe kongera igihe byikora bikora, kugira ngo ikiganiro kirekire kidahinwa mbere yo kongererwa igihe. Bizongera gukora igihe kongera igihe byikora bizimijwe.',
+  idleRestored: 'Guhina ikiganiro mu gihe cy’ikiruhuko byongeye gukora.',
   reportNothing: 'Cache ya prompt: nta cache irabaho. Kubara igihe bitangira nyuma y’igisubizo gikurikira.',
   reportWarm: left => `Cache ya prompt: irakora, hasigaye ${spanRw(left)}.`,
   reportCold: why => `Cache ya prompt: ntikora (${why}).`,

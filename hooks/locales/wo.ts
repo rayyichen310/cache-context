@@ -40,6 +40,8 @@ export const wo: Messages = {
   pingMissed: (counts, cost) => `Cache amul: ${counts}.${cost} Diiru cache bi yokkuwul.`,
   autoLog: (n, budget, text) => `Yokk diir boppam ${n}/${budget}. ${text}`,
   autoMissToast: 'Yokk diir boppam antuwul. Xool /cache-status',
+  idlePaused: 'Wàññi waxtaan ci jamono noflaay dafa fey bi yokk diir boppam di dox, ngir waxtaan bu gudd bañ a wàññiku balaa yokk diir bi. Dina dellu taal bu ñu feyee yokk diir boppam.',
+  idleRestored: 'Wàññi waxtaan ci jamono noflaay dellu na taal.',
   reportNothing: 'Cache bu prompt: amagul cache. Waññi diir bi dina tàmbali gannaaw tontu bi ci topp.',
   reportWarm: left => `Cache bu prompt: mi ngi dox, ${spanWo(left)} moo des.`,
   reportCold: why => `Cache bu prompt: doxul (${why}).`,

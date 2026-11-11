@@ -40,6 +40,8 @@ export const am: Messages = {
   pingMissed: (counts, cost) => `Cache አልተገኘም፦ ${counts}።${cost} የcache ጊዜ አልተራዘመም።`,
   autoLog: (n, budget, text) => `ራስሰር ማራዘም ${n}/${budget}። ${text}`,
   autoMissToast: 'ራስሰር ማራዘም አልተሳካም። /cache-status ይመልከቱ',
+  idlePaused: 'ራስሰር ማራዘም በርቶ እያለ የስራ ፈት ማጠቃለያ ጠፍቷል፣ ረጅም ውይይት ከማራዘሙ በፊት እንዳይጠቃለል። ራስሰር ማራዘም ሲጠፋ ተመልሶ ይበራል።',
+  idleRestored: 'የስራ ፈት ማጠቃለያ ተመልሶ በርቷል።',
   reportNothing: 'Prompt cache፦ ገና cache የለም። ቆጠራው ከቀጣዩ ምላሽ በኋላ ይጀምራል።',
   reportWarm: left => `Prompt cache፦ ንቁ፣ ${spanAm(left)} ቀርቷል።`,
   reportCold: why => `Prompt cache፦ ንቁ አይደለም (${why})።`,

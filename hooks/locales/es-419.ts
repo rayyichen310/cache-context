@@ -41,6 +41,8 @@ export const es419: Messages = {
   pingMissed: (counts, cost) => `Fallo de caché: ${counts}.${cost} No se extendió la duración de la caché.`,
   autoLog: (n, budget, text) => `Renovación auto. ${n}/${budget}. ${text}`,
   autoMissToast: 'La renovación automática no funcionó. Consulta /cache-status',
+  idlePaused: 'La compactación en reposo está desactivada mientras la renovación automática está activa, para que una conversación larga no se compacte antes de renovarse. Se reactiva al apagar la renovación automática.',
+  idleRestored: 'La compactación en reposo está activada de nuevo.',
   reportNothing: 'Caché de prompts: todavía vacía. La cuenta regresiva empieza tras la próxima respuesta.',
   reportWarm: left => `Caché de prompts: activa, quedan ${spanEs(left)}.`,
   reportCold: why => `Caché de prompts: inactiva (${why}).`,

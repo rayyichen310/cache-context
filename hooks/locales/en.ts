@@ -57,6 +57,8 @@ export const en = {
   pingMissed: (counts: string, cost: string) => `Cache miss: ${counts}.${cost} The cache was not extended.`,
   autoLog: (n: number, budget: number, text: string) => `Auto-refresh ${n}/${budget}. ${text}`,
   autoMissToast: 'Auto-refresh did not succeed. See /cache-status',
+  idlePaused: 'Idle compaction is off while auto-refresh is on, so a long conversation is not compacted before its refresh. It comes back on when auto-refresh is turned off.',
+  idleRestored: 'Idle compaction is back on.',
 
   reportNothing: 'Prompt cache: nothing cached yet. The countdown starts after the next response.',
   reportWarm: (left: string) => `Prompt cache: active, ${left} left.`,

@@ -41,6 +41,8 @@ export const de: Messages = {
   pingMissed: (counts, cost) => `Cache-Fehltreffer: ${counts}.${cost} Der Cache wurde nicht verlängert.`,
   autoLog: (n, budget, text) => `Automatische Verlängerung ${n}/${budget}. ${text}`,
   autoMissToast: 'Automatische Verlängerung fehlgeschlagen. Siehe /cache-status',
+  idlePaused: 'Die Leerlauf-Komprimierung ist aus, solange die automatische Verlängerung läuft, damit ein langes Gespräch nicht vor der Verlängerung komprimiert wird. Sie geht wieder an, wenn die automatische Verlängerung ausgeht.',
+  idleRestored: 'Die Leerlauf-Komprimierung ist wieder an.',
   reportNothing: 'Prompt-Cache: noch leer. Der Countdown beginnt nach der nächsten Antwort.',
   reportWarm: left => `Prompt-Cache: aktiv, noch ${spanDe(left)}.`,
   reportCold: why => `Prompt-Cache: inaktiv (${why}).`,

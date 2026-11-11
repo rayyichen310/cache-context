@@ -42,6 +42,8 @@ export const da: Messages = {
   pingMissed: (counts, cost) => `Cache-miss: ${counts}.${cost} Cachens levetid blev ikke forlænget.`,
   autoLog: (n, budget, text) => `Automatisk fornyelse ${n}/${budget}. ${text}`,
   autoMissToast: 'Automatisk fornyelse mislykkedes. Se /cache-status',
+  idlePaused: 'Komprimering ved inaktivitet er slået fra, mens automatisk fornyelse er slået til, så en lang samtale ikke komprimeres før fornyelsen. Den slås til igen, når automatisk fornyelse slås fra.',
+  idleRestored: 'Komprimering ved inaktivitet er slået til igen.',
   reportNothing: 'Promptcache: intet cachet endnu. Nedtællingen starter efter næste svar.',
   reportWarm: left => `Promptcache: aktiv, ${spanDa(left)} tilbage.`,
   reportCold: why => `Promptcache: ikke aktiv (${why}).`,

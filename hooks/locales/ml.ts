@@ -44,6 +44,8 @@ export const ml: Messages = {
   pingMissed: (counts, cost) => `Cache miss: ${counts}.${cost} Cache കാലാവധി നീട്ടിയില്ല.`,
   autoLog: (n, budget, text) => `Auto-refresh ${n}/${budget}. ${text}`,
   autoMissToast: 'Auto-refresh വിജയിച്ചില്ല. /cache-status കാണുക',
+  idlePaused: 'Auto-refresh ഓണായിരിക്കുമ്പോൾ idle compaction ഓഫാണ്, അതിനാൽ നീണ്ട സംഭാഷണം refresh-ന് മുമ്പ് compact ആകില്ല. Auto-refresh ഓഫാക്കുമ്പോൾ ഇത് വീണ്ടും ഓണാകും.',
+  idleRestored: 'Idle compaction വീണ്ടും ഓണായി.',
 
   reportNothing: 'Prompt cache: ഇതുവരെ cache ഇല്ല. അടുത്ത മറുപടിക്ക് ശേഷം കൗണ്ട്ഡൗൺ തുടങ്ങും.',
   reportWarm: left => `Prompt cache: സജീവം, ${spanMl(left)} ബാക്കി.`,

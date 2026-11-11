@@ -40,6 +40,8 @@ export const ha: Messages = {
   pingMissed: (counts, cost) => `Ba a sami cache ba: ${counts}.${cost} Ba a tsawaita cache ba.`,
   autoLog: (n, budget, text) => `Tsawaita ta atomatik ${n}/${budget}. ${text}`,
   autoMissToast: 'Tsawaita ta atomatik ba ta yi nasara ba. Duba /cache-status',
+  idlePaused: 'An kashe matsawa lokacin hutu yayin da tsawaita ta atomatik ke kunne, don kada a matsa dogon tattaunawa kafin a tsawaita ta. Za ta dawo idan an kashe tsawaita ta atomatik.',
+  idleRestored: 'An sake kunna matsawa lokacin hutu.',
   reportNothing: 'Cache na prompt: babu cache tukuna. Ƙidayar lokaci za ta fara bayan amsa ta gaba.',
   reportWarm: left => `Cache na prompt: yana aiki, ${spanHa(left)} sun rage.`,
   reportCold: why => `Cache na prompt: ba ya aiki (${why}).`,

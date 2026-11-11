@@ -41,6 +41,8 @@ export const fil: Messages = {
   pingMissed: (counts, cost) => `Cache miss: ${counts}.${cost} Hindi napalawig ang bisa ng cache.`,
   autoLog: (n, budget, text) => `Awtomatikong pagpapalawig ${n}/${budget}. ${text}`,
   autoMissToast: 'Hindi gumana ang awtomatikong pagpapalawig. Tingnan ang /cache-status',
+  idlePaused: 'Naka-off ang idle compaction habang naka-on ang awtomatikong pagpapalawig, para hindi ma-compact ang mahabang usapan bago ito mapalawig. Babalik ito kapag in-off ang awtomatikong pagpapalawig.',
+  idleRestored: 'Naka-on muli ang idle compaction.',
   reportNothing: 'Prompt cache: wala pang naka-cache. Magsisimula ang countdown pagkatapos ng susunod na sagot.',
   reportWarm: left => `Prompt cache: aktibo, ${spanFil(left)} pa.`,
   reportCold: why => `Prompt cache: hindi aktibo (${why}).`,

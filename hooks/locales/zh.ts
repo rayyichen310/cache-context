@@ -52,6 +52,8 @@ export const zh: Messages = {
   pingMissed: (counts, cost) => `未命中缓存：${counts}。${cost}缓存未能续期。`,
   autoLog: (n, budget, text) => `自动续期 ${n}/${budget}。${text}`,
   autoMissToast: '自动续期未成功，详见 /cache-status',
+  idlePaused: '自动续期开启期间已关闭闲时压缩，长对话不会在续期前被压缩。关闭自动续期时会恢复。',
+  idleRestored: '已恢复闲时压缩。',
 
   reportNothing: '提示缓存：暂无缓存，下次回复后开始倒计时。',
   reportWarm: left => `提示缓存：有效，剩余 ${spanZh(left)}。`,

@@ -51,6 +51,13 @@ const MAX_OBSERVATIONS = 100
 const EXTENDS = 'pingExtends'
 const LANG = 'lang'
 const HEARD = 'langHeard'
+// Set while auto-refresh has idle compaction turned off, so turning auto-refresh off turns it back on.
+const PAUSED = 'idleCompactionPaused'
+// The sessions with auto-refresh on, by when each last said so: the setting is shared, auto-refresh is per session.
+const HOLDERS = 'idleCompactionHolders'
+// A session renews its hold this often; one not heard from for longer than the stale age has ended without saying so.
+const HOLD_BEAT_MS = 60_000
+const HOLD_STALE_MS = 5 * 60_000
 
 type TtlChoice = Pick<Snapshot, 'ttl' | 'ttlSource'>
 
@@ -87,6 +94,10 @@ let lastAction = ''
 let lastHead = ''
 // The language the open panel's title was last written in.
 let titledIn: Lang | undefined
+// When this session last renewed its hold on idle compaction.
+let heldBeatAt = 0
+// Changes to the hold run one at a time, so two quick toggles cannot interleave.
+let holdQueue: Promise<unknown> = Promise.resolve()
 // When the panel was last opened: its entrance plays from that moment.
 let openedAt: number | undefined
 // The touch that last refilled the cache, and the share of its lifetime left before it: the ring sweeps back from there.
@@ -218,6 +229,63 @@ async function knownExtension($: EngineInterface): Promise<Extension> {
 async function learnExtension($: EngineInterface, ttl: Ttl, doesExtend: boolean): Promise<void> {
   extension = { ...(await knownExtension($)), [ttl]: doesExtend }
   await $.store.set(EXTENDS, extension)
+}
+
+// Idle compaction runs at 90% of a one-hour cache's lifetime, before an auto-refresh would go out, so it is off while any session has auto-refresh on.
+// Only a setting this mod turned off is turned back on; one that was off already stays off.
+function holdIdleCompaction($: EngineInterface, isAutoOn: boolean, sessionId?: string): Promise<'paused' | 'restored' | null> {
+  const run = holdQueue.then(() => changeHold($, isAutoOn, sessionId))
+  holdQueue = run.catch(() => undefined)
+
+  return run
+}
+
+async function changeHold($: EngineInterface, isAutoOn: boolean, sessionId?: string): Promise<'paused' | 'restored' | null> {
+  try {
+    const id = sessionId ?? (await $.session.id())
+    const now = await $.clock.now()
+    const stored = await $.store.get(HOLDERS)
+    const holders: Record<string, number> = {}
+    if (typeof stored === 'object' && stored !== null) {
+      for (const [other, at] of Object.entries(stored)) {
+        if (other !== id && typeof at === 'number' && now - at < HOLD_STALE_MS) holders[other] = at
+      }
+    }
+    if (isAutoOn) holders[id] = now
+    await $.store.set(HOLDERS, holders)
+    if (isAutoOn) heldBeatAt = now
+    const isWanted = Object.keys(holders).length > 0
+    const isPaused = (await $.store.get(PAUSED)) === true
+    if (isWanted === isPaused) return null
+    // The setting's key is written out in each call: the plugin directory accepts a settings write only with its key as fixed text.
+    const row = (await $.config.list()).find(each => each.key === 'idleCompaction')
+    if (isWanted) {
+      if (row?.value !== true) return null
+      // Recorded before the write: a record with the setting still on is cleared harmlessly, a write with no record would never be undone.
+      await $.store.set(PAUSED, true)
+      if ((await $.config.set({ key: 'idleCompaction', value: false })).deny === undefined) return 'paused'
+      await $.store.set(PAUSED, false)
+
+      return null
+    }
+    // A row another settings file now holds cannot be written: the record stays, to try again later.
+    if (row === undefined) return null
+    if (row.value === false && (await $.config.set({ key: 'idleCompaction', value: true })).deny !== undefined) return null
+    await $.store.set(PAUSED, false)
+
+    return row.value === false ? 'restored' : null
+  } catch {
+    return null
+  }
+}
+
+async function setAuto($: EngineInterface, change: (held: { isOn: boolean; cap: number }) => { isOn: boolean; cap: number }): Promise<string | null> {
+  const held = await update($, auto, change)
+  const outcome = await holdIdleCompaction($, held.isOn)
+  if (outcome === null) return null
+  const m = MESSAGES[await langOf($)]
+
+  return outcome === 'paused' ? m.idlePaused : m.idleRestored
 }
 
 async function viewOf($: EngineInterface): Promise<View> {
@@ -522,6 +590,8 @@ async function ping($: EngineInterface, isForced: boolean): Promise<PingResult> 
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     isHeadless = !e.isInteractive
+    // A session that ended without saying so (a crash, a kill) leaves its hold behind until it goes stale.
+    void holdIdleCompaction($, (await read($, auto)).isOn)
     $.clock.every(1000, async () => {
       const lang = await langOf($)
       const m = MESSAGES[lang]
@@ -542,9 +612,11 @@ export const register: Register = on => {
         $.ui.invalidate('ui.render')
       }
 
+      const policy = await read($, auto)
+      if (policy.isOn && now - heldBeatAt >= HOLD_BEAT_MS) void holdIdleCompaction($, true)
+
       // The keep-alive. A request under way has already touched the cache.
       if (held === null || pingAt !== null || inFlight > 0) return
-      const policy = await read($, auto)
       if (!policy.isOn) return
       const remaining = remainingOf(held, now)
       if (remaining <= PING_MARGIN_MS || remaining > LEAD_MS[held.ttl]) return
@@ -605,6 +677,16 @@ export const register: Register = on => {
     await measureContext($)
 
     return result
+  })
+
+  on('session.end', async ($, e, next) => {
+    // Auto-refresh ends with the conversation: after a /clear or a resume the next one starts with it off.
+    if ((await read($, auto)).isOn) {
+      await update($, auto, held => ({ ...held, isOn: false }))
+      await holdIdleCompaction($, false, e.sessionId)
+    }
+
+    return next(e)
   })
 
   on('turn.step', async function* ($, e, next) {
@@ -692,14 +774,16 @@ export const register: Register = on => {
     const wanted = words.find(word => word === 'on' || word === 'off')
     const cap = words.map(Number).find(n => Number.isInteger(n) && n > 0 && n <= MAX_CAP)
     if (words.length > 0 && wanted === undefined && cap === undefined) return { text: m.autoUsage(MAX_CAP) }
-    if (words.length > 0) {
-      await update($, auto, now => ({
-        isOn: wanted === undefined ? true : wanted === 'on',
-        cap: cap ?? now.cap,
-      }))
-    }
+    const idle =
+      words.length > 0
+        ? await setAuto($, now => ({
+            isOn: wanted === undefined ? true : wanted === 'on',
+            cap: cap ?? now.cap,
+          }))
+        : null
+    const lines = [m.autoHeader, ...autoLines(m, await viewOf($)), m.autoNote]
 
-    return { text: [m.autoHeader, ...autoLines(m, await viewOf($)), m.autoNote].join('\n') }
+    return { text: (idle === null ? lines : [...lines, `  ${idle}`]).join('\n') }
   })
 
   on('command.run', { command: 'cache-lang' }, async ($, e) => {
@@ -732,8 +816,9 @@ export const register: Register = on => {
     const ctx = await contextPartOf($, m.tag, false)
 
     return paneView($.ui.resolve(e), e.surface, m, await viewOf($), lastAction, {
-      onToggle: () => {
-        void update($, auto, held => ({ ...held, isOn: !held.isOn }))
+      onToggle: async () => {
+        const idle = await setAuto($, held => ({ ...held, isOn: !held.isOn }))
+        if (idle !== null) $.ui.toast(idle)
       },
       onCapDown: () => {
         void update($, auto, held => ({ ...held, cap: Math.max(1, held.cap - 1) }))
