@@ -286,6 +286,18 @@ test('"Not this time" lets the work go on until the window resets', async ($, on
   expect(await (await pane($)).find({ key: 'guard-cancel' })).toBeUndefined()
 })
 
+test('"Not this time" holds across a restart until the window resets', async ($, on) => {
+  const { clock, world } = await guarded($, on, { percent: 97, store: { usageGuardSkip: RESET } })
+  await turnWithReply($)
+  expect((await bash($)).context).toBeUndefined()
+
+  // Past the reset the guard watches again.
+  await clock.advance(11 * MINUTE)
+  await turnWithReply($, 't2')
+  expect((await bash($)).context).toEqual([WRAP_UP_REMINDER])
+  void world
+})
+
 test('"Stop now" ends the turn at once, and the session pauses', async ($, on) => {
   const { world } = await guarded($, on, { percent: 97 })
   await turnWithReply($)

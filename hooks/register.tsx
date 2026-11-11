@@ -84,6 +84,8 @@ const AUTO = 'auto'
 // The usage guard's settings, kept across restarts, and each session's pause, so a restart plans its continue again.
 const GUARD = 'usageGuard'
 const PAUSES = 'usagePauses'
+// "Not this time": until when the guard stays quiet, the five-hour window's reset. The window is the account's, so every session keeps to it.
+const SKIP = 'usageGuardSkip'
 // A kept pause this long past its reset belongs to a session that will not come back for it.
 const PAUSE_STALE_MS = 24 * 60 * 60_000
 const FIVE_HOURS_MS = 5 * 60 * 60_000
@@ -476,12 +478,15 @@ async function restoreGuard($: EngineInterface): Promise<void> {
   if (!settings.isOn) return
   const autoContinue = await readAutoContinue($)
   const kept = keptPauses(await $.store.get(PAUSES))[await $.session.id()]
+  const skip = await $.store.get(SKIP)
+  const skipUntil = typeof skip === 'number' ? skip : 0
   // A reload keeps the session's state but not the turn a continue started: it is planned again from now.
   await changeRun($, r => {
     const isPaused = r.phase === 'paused' || r.phase === 'resumeFailed'
-    if (kept === undefined || isPaused) return { ...r, autoContinue, isResuming: false }
+    const base = { ...r, autoContinue, isResuming: false, skipUntil: Math.max(r.skipUntil, skipUntil) }
+    if (kept === undefined || isPaused) return base
 
-    return { ...r, ...kept, autoContinue, isResuming: false }
+    return { ...base, ...kept }
   })
 }
 
@@ -1131,6 +1136,7 @@ export const register: Register = on => {
       onSkip: async () => {
         const now = await $.clock.now()
         const run = await changeRun($, r => ({ ...r, phase: 'watching', toolsUsed: 0, denied: 0, skipUntil: r.resetsAt ?? now + FIVE_HOURS_MS }))
+        await $.store.set(SKIP, run.skipUntil)
         await keepPause($, run)
       },
       onResume: async () => {
