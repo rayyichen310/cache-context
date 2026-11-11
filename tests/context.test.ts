@@ -217,6 +217,22 @@ test('in English the panel keeps its rows inside the column, in ordinary bracket
   await pane.unmount()
 })
 
+// After a compaction, before the next reply, there are no tokens yet; with auto-compaction off, no threshold.
+const { tokens: _, ...NO_TOKENS } = USAGE.context
+const NO_ROOM_SHOWN = {
+  'after a compaction': { ...USAGE, context: NO_TOKENS },
+  'with auto-compaction off': { ...USAGE, context: { ...USAGE.context, breakdown: { ...USAGE.context.breakdown, isAutoCompactEnabled: false } } },
+}
+for (const [when, usage] of Object.entries(NO_ROOM_SHOWN)) {
+  test(`${when}, the desktop panel still draws, its compact button in place`, { timeoutMs: 30_000 }, async ($, on) => {
+    await setUp($, on, 'en', false, usage as typeof USAGE)
+    const pane = await $.ui.mount({ plugin: 'cache-context', surface: 'desktop', component: 'Pane', requestId: 'cache', props: paneProps })
+    expect(await pane.find({ key: 'compact' })).toBeDefined()
+    expect((await pane.findAll({ type: 'Svg' })).every(one => Number(one.props.width) > 0)).toBe(true)
+    await pane.unmount()
+  })
+}
+
 test('where compaction cannot be called, as in the desktop app, compact runs /compact instead', { timeoutMs: 30_000 }, async ($, on) => {
   const calls = await setUp($, on, 'zh-Hant', true)
   const ui = await $.ui.mount({ plugin: 'cache-context', surface: 'desktop', component: 'AbovePrompt', props: bandProps(false) })

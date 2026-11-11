@@ -550,9 +550,12 @@ function contextSection(els: Els, surface: Surface, m: Messages, ctx: ContextPar
       Svg({ alt: `${used} ${amount}`, width: PANEL_PIXELS, height: 6, source: barSvg(meter, PANEL_PIXELS, m.tag) }),
     )
     // Drawn only as wide as its words (14px type, about 7.3px a cell), so the compact button keeps the rest of the row.
+    // With no room to show (no tokens since a compaction, or auto-compaction off) there are no words to draw:
+    // a drawing 0px wide is refused, and the whole panel with it.
     const wordsWidth = Math.min(LABEL_PIXELS, Math.ceil(cells(toAuto) * 7.3))
     const words = labelSvg(toAuto, wordsWidth, 'body', m)
-    rows.push(between([Svg({ alt: toAuto, width: wordsWidth, height: words.height, source: words.source }), ...(control === null ? [] : [control])]))
+    const lead = toAuto === '' ? Box({ flexGrow: 1, children: [] }) : Svg({ alt: toAuto, width: wordsWidth, height: words.height, source: words.source })
+    rows.push(between([lead, ...(control === null ? [] : [control])]))
   } else {
     const width = Math.max(10, Math.min(PANEL_CELLS, columns) - 2)
     rows.push(
