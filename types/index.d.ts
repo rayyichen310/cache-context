@@ -80,6 +80,11 @@ export type Guard = {
   isOn: boolean
   /** The five-hour usage, in percent, at which Claude is asked to wrap up. */
   threshold: number
+  /**
+   * Whether a pause ends with a continue prompt after the reset. The mod's own: Claude Code lets a mod turn
+   * its `autoContinueAtUsageLimit` off but not on, so the two are kept apart.
+   */
+  autoContinue: boolean
 }
 
 /**
@@ -107,8 +112,6 @@ export type GuardRun = {
   isResuming: boolean
   /** A refresh was refused at the usage limit: refreshing waits for this reset (null when none was given). */
   limit: { reset: number | null } | null
-  /** Claude Code's own "continue at the usage-limit reset" setting, as last read; null where it has none. */
-  autoContinue: boolean | null
 }
 
 declare module 'claude-code' {

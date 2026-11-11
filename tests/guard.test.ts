@@ -32,21 +32,22 @@ const BREAKDOWN = {
 // The panel open now: a pane is mounted once at a time, so a fresh look unmounts the last.
 let mounted: any
 
-type Setup = { percent?: number; weekly?: number; autoContinue?: boolean | null; store?: Record<string, unknown> }
+type Setup = { percent?: number; weekly?: number; autoContinue?: boolean; store?: Record<string, unknown> }
 
-/** A session with the guard on, the five-hour window at `percent`, and Claude Code's continue setting as given. */
+/** A session with the guard on, the five-hour window at `percent`, and the guard's continue switch as given. */
 async function guarded($: any, on: any, setup: Setup = {}) {
   mounted = undefined
   const clock = mock.clock(on, { now: START })
-  mock.store(on, { ...GUARD_ON, ...setup.store })
+  const settings = { ...GUARD_ON.usageGuard, autoContinue: setup.autoContinue ?? true }
+  mock.store(on, { usageGuard: settings, ...setup.store })
   mock.env(on, { CLAUDE_CODE_PROMPT_CACHE_TTL: '1h' })
   const world = {
     percent: setup.percent ?? 50,
     weekly: setup.weekly ?? 10,
-    autoContinue: setup.autoContinue === undefined ? true : setup.autoContinue,
+    // Claude Code's own setting, which a mod may turn off but not on: the guard must not touch it.
+    nativeContinue: true,
     aborted: [] as string[],
     submitted: [] as string[],
-    written: [] as boolean[],
   }
   on('session.usage', () => ({
     value: {
@@ -59,16 +60,15 @@ async function guarded($: any, on: any, setup: Setup = {}) {
     },
   }))
   on('config.list', () => ({
-    value: world.autoContinue === null
-      ? []
-      : [{ key: 'autoContinueAtUsageLimit', label: 'Auto-continue', kind: 'boolean', value: world.autoContinue, provider: { plugin: 'engine', tier: 'core' }, isLocked: false }],
+    value: [{ key: 'autoContinueAtUsageLimit', label: 'Continue automatically at usage limit', kind: 'boolean', value: world.nativeContinue, provider: { plugin: 'engine', tier: 'core' }, isLocked: false }],
   }))
+  // As Claude Code answers a mod: off is written, on is refused.
   on('config.set', (_: unknown, e: { key: string; value: boolean }) => {
     if (e.key !== 'autoContinueAtUsageLimit') return { deny: `unexpected key ${e.key}` }
-    world.autoContinue = e.value
-    world.written.push(e.value)
+    if (e.value) return { deny: 'Continue automatically at usage limit can only be turned on from the /config panel.' }
+    world.nativeContinue = false
 
-    return { value: e.value }
+    return { value: false }
   })
   on('session.id', () => ({ value: 'session-a' }))
   on('turn.abort', (_: unknown, e: { turnId: string }) => {
@@ -266,7 +266,7 @@ test('with the seven-day window used up there is no automatic continue, and the 
   expect(world.submitted).toHaveLength(0)
 })
 
-test('with Claude Code\'s continue setting off the pause waits for the person', async ($, on) => {
+test('with the continue switch off the pause waits for the person', async ($, on) => {
   const { clock, world } = await pausedSession($, on, { autoContinue: false })
   expect(await (await pane($)).find({ type: 'Text', text: `Paused · usage resets at ${fmtClock(RESET)}; continue by hand` })).toBeDefined()
   await clock.advance(11 * MINUTE)
@@ -327,8 +327,8 @@ test('"Cancel continue" keeps the pause without sending anything', async ($, on)
   expect(world.submitted).toHaveLength(0)
 })
 
-test('the panel shows the usage, sets the threshold, and turns Claude Code\'s continue setting', async ($, on) => {
-  const { world } = await guarded($, on, { percent: 42 })
+test('the panel shows the usage and sets the threshold', async ($, on) => {
+  await guarded($, on, { percent: 42 })
   await turnWithReply($)
   for (const surface of ['terminal', 'desktop'] as const) {
     const ui = await pane($, surface)
@@ -339,21 +339,33 @@ test('the panel shows the usage, sets the threshold, and turns Claude Code\'s co
   expect(await ui.find({ type: 'Text', text: `5-hour 42% · resets ${fmtClock(RESET)}` })).toBeDefined()
   await ui.press({ key: 'guard-down' })
   expect(await ui.find({ type: 'Text', text: '96%' })).toBeDefined()
-  await ui.press({ key: 'guard-continue' })
-  expect(world.written).toEqual([false])
-  expect((await ui.find({ key: 'guard-continue' }))?.text).toContain('Turn on')
 
-  // Turned off, the section is its switch alone, and the setting is kept for the next start.
+  // Turned off, the section is its switch alone.
   await ui.press({ key: 'guard-toggle' })
   expect(await ui.find({ key: 'guard-continue' })).toBeUndefined()
   expect((await ui.find({ key: 'guard-toggle' }))?.text).toContain('Turn on')
 })
 
-test('where Claude Code has no continue setting the panel says so', async ($, on) => {
-  await guarded($, on, { autoContinue: null })
+test('the continue switch turns off and back on, apart from Claude Code\'s own setting', async ($, on) => {
+  const { clock, world } = await pausedSession($, on)
   const ui = await pane($)
-  expect(await ui.find({ key: 'guard-continue' })).toBeUndefined()
-  expect(await ui.find({ type: 'Text', text: 'Continue after the reset: Not offered by this Claude Code' })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: 'This switch is the mod\'s own, apart from "Continue automatically at usage limit" in /config.' })).toBeUndefined()
+
+  await ui.press({ key: 'guard-cancel' })
+  await ui.press({ key: 'guard-toggle' })
+  await ui.press({ key: 'guard-toggle' })
+  expect(await ui.find({ type: 'Text', text: 'This switch is the mod\'s own, apart from "Continue automatically at usage limit" in /config.' })).toBeDefined()
+  await ui.press({ key: 'guard-continue' })
+  expect((await ui.find({ key: 'guard-continue' }))?.text).toContain('Turn on')
+  await ui.press({ key: 'guard-continue' })
+  expect((await ui.find({ key: 'guard-continue' }))?.text).toContain('Turn off')
+  expect(world.nativeContinue).toBe(true)
+
+  // Back on, the next pause plans its continue again.
+  await turnWithReply($, 't2')
+  await endTurn($, 't2')
+  await clock.advance(11 * MINUTE)
+  expect(world.submitted).toHaveLength(1)
 })
 
 test('the band says the session is wrapping up, then paused until the continue', async ($, on) => {

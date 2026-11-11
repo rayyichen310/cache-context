@@ -360,13 +360,6 @@ async function changeRun($: EngineInterface, change: (run: GuardRun) => GuardRun
   return run
 }
 
-/** Claude Code's own "continue at the usage-limit reset" setting; null where this version has none. */
-async function readAutoContinue($: EngineInterface): Promise<boolean | null> {
-  const row = (await $.config.list()).find(each => each.key === 'autoContinueAtUsageLimit')
-
-  return typeof row?.value === 'boolean' ? row.value : null
-}
-
 /** Reads the plan's windows, noting the five-hour one's use and reset for the guard. */
 async function readUsage($: EngineInterface) {
   const limits = (await $.session.usage()).rateLimits
@@ -406,14 +399,14 @@ async function watchUsage($: EngineInterface): Promise<void> {
   }
 }
 
-/** The wrapped-up turn has ended: paused until the reset, with a continue planned when Claude Code's setting asks for one. */
+/** The wrapped-up turn has ended: paused until the reset, with a continue planned when the guard's switch asks for one. */
 async function startPause($: EngineInterface): Promise<void> {
   const { limits, five } = await readUsage($)
-  const autoContinue = await readAutoContinue($)
+  const { autoContinue } = await read($, guard)
   const isWeekly = isWeeklyFull(limits)
   const resetsAt = five?.resetsAt ?? null
-  const resumeAt = autoContinue === true && !isWeekly && resetsAt !== null ? resetsAt + RESUME_DELAY_MS : null
-  const run = await changeRun($, r => ({ ...r, phase: 'paused', autoContinue, isWeekly, resumeAt, resumeTries: 0, isResuming: false }))
+  const resumeAt = autoContinue && !isWeekly && resetsAt !== null ? resetsAt + RESUME_DELAY_MS : null
+  const run = await changeRun($, r => ({ ...r, phase: 'paused', isWeekly, resumeAt, resumeTries: 0, isResuming: false }))
   await keepPause($, run)
 }
 
@@ -460,13 +453,13 @@ async function settleTurn($: EngineInterface, turnId: string, reason: string): P
   else await endPause($)
 }
 
-/** Takes Claude Code's continue setting as changed, planning or dropping a paused session's continue with it. */
+/** The continue switch changed: a paused session plans its continue, or drops it, with it. */
 async function applyAutoContinue($: EngineInterface, value: boolean): Promise<void> {
   const run = await changeRun($, r => {
-    if (r.phase !== 'paused' || r.isResuming) return { ...r, autoContinue: value }
+    if (r.phase !== 'paused' || r.isResuming) return r
     const resumeAt = value && !r.isWeekly && r.resetsAt !== null ? r.resetsAt + RESUME_DELAY_MS : null
 
-    return { ...r, autoContinue: value, resumeAt }
+    return { ...r, resumeAt }
   })
   if (run.phase === 'paused') await keepPause($, run)
 }
@@ -476,14 +469,13 @@ async function restoreGuard($: EngineInterface): Promise<void> {
   const settings = keptGuard(await $.store.get(GUARD))
   await update($, guard, () => settings)
   if (!settings.isOn) return
-  const autoContinue = await readAutoContinue($)
   const kept = keptPauses(await $.store.get(PAUSES))[await $.session.id()]
   const skip = await $.store.get(SKIP)
   const skipUntil = typeof skip === 'number' ? skip : 0
   // A reload keeps the session's state but not the turn a continue started: it is planned again from now.
   await changeRun($, r => {
     const isPaused = r.phase === 'paused' || r.phase === 'resumeFailed'
-    const base = { ...r, autoContinue, isResuming: false, skipUntil: Math.max(r.skipUntil, skipUntil) }
+    const base = { ...r, isResuming: false, skipUntil: Math.max(r.skipUntil, skipUntil) }
     if (kept === undefined || isPaused) return base
 
     return { ...base, ...kept }
@@ -971,13 +963,6 @@ export const register: Register = on => {
     return next(e)
   })
 
-  on('config.set', { key: 'autoContinueAtUsageLimit' }, async ($, e, next) => {
-    const result = await next(e)
-    if (result.deny === undefined && typeof result.value === 'boolean') await applyAutoContinue($, result.value)
-
-    return result
-  })
-
   on('classic.SessionStart', async ($, e, next) => {
     if (e.source === 'compact') {
       // The compacted conversation shares no prefix with what was cached.
@@ -1110,8 +1095,6 @@ export const register: Register = on => {
           await endPause($)
           return
         }
-        const autoContinue = await readAutoContinue($)
-        await changeRun($, r => ({ ...r, autoContinue }))
         await readUsage($)
       },
       onThresholdDown: () => {
@@ -1121,12 +1104,8 @@ export const register: Register = on => {
         void setGuard($, held => ({ ...held, threshold: Math.min(MAX_THRESHOLD, held.threshold + 1) }))
       },
       onAutoContinue: async () => {
-        const now = (await read($, guardRun)).autoContinue
-        if (now === null) return
-        // The key is written out as fixed text: the plugin directory accepts a settings write only so.
-        const written = await $.config.set({ key: 'autoContinueAtUsageLimit', value: !now })
-        if (written.deny !== undefined) $.ui.toast(written.deny)
-        else await applyAutoContinue($, !now)
+        const settings = await setGuard($, held => ({ ...held, autoContinue: !held.autoContinue }))
+        await applyAutoContinue($, settings.autoContinue)
       },
       onStop: async () => {
         if (mainTurnId === null) return

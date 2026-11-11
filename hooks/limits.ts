@@ -5,7 +5,7 @@ import type { Guard, GuardRun } from '../types'
 // The plan's own windows; a gateway's spend limit is not one a reset brings back.
 const PLAN_WINDOWS = ['five_hour', 'seven_day']
 
-export const DEFAULT_GUARD: Guard = { isOn: false, threshold: 97 }
+export const DEFAULT_GUARD: Guard = { isOn: false, threshold: 97, autoContinue: true }
 export const MIN_THRESHOLD = 50
 export const MAX_THRESHOLD = 99
 // Past this the guard refuses tools whatever is left of the grace.
@@ -31,7 +31,6 @@ export const IDLE_RUN: GuardRun = {
   resumeTries: 0,
   isResuming: false,
   limit: null,
-  autoContinue: null,
 }
 
 // What the model reads after each tool result while wrapping up; the person never sees it.
@@ -49,7 +48,7 @@ export type LimitWords = {
   resets: (time: string) => string
   threshold: string
   autoContinue: string
-  autoContinueNone: string
+  autoContinueNote: string
   wrapping: string
   wrappingLeft: (tools: number) => string
   blocking: string
@@ -84,7 +83,7 @@ const EN: LimitWords = {
   resets: time => `resets ${time}`,
   threshold: 'Wrap up at',
   autoContinue: 'Continue after the reset',
-  autoContinueNone: 'Not offered by this Claude Code',
+  autoContinueNote: 'This switch is the mod\'s own, apart from "Continue automatically at usage limit" in /config.',
   wrapping: 'Wrapping up: Claude was asked to save its progress and stop',
   wrappingLeft: tools => `${tools} more tool uses, then stopped (or at 99%)`,
   blocking: 'Wrapping up: tools are refused until Claude writes down its progress',
@@ -119,7 +118,7 @@ const ZH_HANT: LimitWords = {
   resets: time => `${time} 重置`,
   threshold: '到這個用量時收尾',
   autoContinue: '重置後自動繼續',
-  autoContinueNone: '這版 Claude Code 沒有這個設定',
+  autoContinueNote: '這是本外掛自己的開關，和 /config 的「Continue automatically at usage limit」分開。',
   wrapping: '收尾中：已提醒 Claude 存好進度後停下',
   wrappingLeft: tools => `還能用 ${tools} 次工具，用完或到 99% 就強制停止`,
   blocking: '收尾中：已擋下工具，等 Claude 寫下進度後停止',
@@ -193,12 +192,13 @@ export function blockingReset(limits: readonly SessionRateLimit[]): number | nul
 /** The guard settings the store kept, or the defaults where it kept none or one of the wrong shape. */
 export function keptGuard(held: unknown): Guard {
   if (typeof held !== 'object' || held === null) return DEFAULT_GUARD
-  const { isOn, threshold } = held as Record<string, unknown>
+  const { isOn, threshold, autoContinue } = held as Record<string, unknown>
   const isThreshold =
     typeof threshold === 'number' && Number.isInteger(threshold) && threshold >= MIN_THRESHOLD && threshold <= MAX_THRESHOLD
   if (typeof isOn !== 'boolean' || !isThreshold) return DEFAULT_GUARD
 
-  return { isOn, threshold }
+  // Kept before the switch existed it is absent, and takes the default.
+  return { isOn, threshold, autoContinue: typeof autoContinue === 'boolean' ? autoContinue : DEFAULT_GUARD.autoContinue }
 }
 
 /** The wait before the n-th retry of a refused continue (1-based). */

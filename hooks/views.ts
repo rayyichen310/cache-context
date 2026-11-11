@@ -928,12 +928,13 @@ export function paneView(
           ],
         }),
       ]))
-      guardRows.push(run.autoContinue === null
-        ? dim(`${w.autoContinue}: ${w.autoContinueNone}`)
-        : between([
-            words(w.autoContinue, 'body'),
-            Button({ key: 'guard-continue', label: run.autoContinue ? w.btnOff : w.btnOn, variant: 'secondary', onPress: guardPart.onAutoContinue }),
-          ]))
+      guardRows.push(
+        between([
+          words(w.autoContinue, 'body'),
+          Button({ key: 'guard-continue', label: settings.autoContinue ? w.btnOff : w.btnOn, variant: 'secondary', onPress: guardPart.onAutoContinue }),
+        ]),
+        dim(w.autoContinueNote),
+      )
     } else if (settings.isOn && (run.phase === 'wrapping' || run.phase === 'blocking')) {
       guardRows.push(dim(run.phase === 'wrapping' ? w.wrapping : w.blocking))
       if (run.phase === 'wrapping') guardRows.push(dim(w.wrappingLeft(Math.max(0, GRACE_TOOLS - run.toolsUsed))))
