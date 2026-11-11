@@ -359,6 +359,18 @@ test('the panel shows the usage and sets the threshold', async ($, on) => {
   expect((await ui.find({ key: 'guard-toggle' }))?.text).toContain('Turn on')
 })
 
+test('past the window\'s reset the panel no longer shows the old usage', async ($, on) => {
+  const { clock } = await guarded($, on, { percent: 94 })
+  await turnWithReply($)
+  expect(await (await pane($)).find({ type: 'Text', text: `5-hour 94% · resets ${fmtClock(RESET)}` })).toBeDefined()
+
+  // The reading is the last response's: no reply has come since, but the window has reset.
+  await clock.advance(11 * MINUTE)
+  const ui = await pane($)
+  expect(await ui.find({ type: 'Text', text: '5-hour 0%' })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: `5-hour 94% · resets ${fmtClock(RESET)}` })).toBeUndefined()
+})
+
 test('the continue switch turns off and back on, apart from Claude Code\'s own setting', async ($, on) => {
   const { clock, world } = await pausedSession($, on)
   const ui = await pane($)

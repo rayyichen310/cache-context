@@ -482,11 +482,17 @@ async function restoreGuard($: EngineInterface): Promise<void> {
   })
 }
 
-/** Each second: a continue that is due goes out, and a usage limit that has reset stops being shown. */
+/**
+ * Each second: a continue that is due goes out, and a usage limit that has reset stops being shown.
+ * A watched window's reading is the last reply's, so past its reset it reads as a new window, unused, until the next reply.
+ */
 async function tickGuard($: EngineInterface, now: number): Promise<void> {
   const run = await read($, guardRun)
   if (run.limit !== null && run.limit.reset !== null && now >= run.limit.reset) {
     await changeRun($, r => ({ ...r, limit: null }))
+  }
+  if (run.phase === 'watching' && run.percent !== null && run.resetsAt !== null && now >= run.resetsAt) {
+    await changeRun($, r => ({ ...r, percent: 0, resetsAt: null }))
   }
   if (run.phase === 'paused' && run.resumeAt !== null && !run.isResuming && now >= run.resumeAt) await resume($)
 }
