@@ -58,7 +58,8 @@ Once the five-hour usage runs out, refreshes are refused too, so the cache expir
 
 - Turn it on with Guard on the status bar, "Turn on" in the panel, or `/cache-guard on`.
 - When the five-hour usage reaches the threshold (97% unless you change it), the guard asks Claude to finish the step in hand, write down its progress and stop.
-- The session then pauses; with auto-refresh on, the cache goes on being refreshed through the pause, so it is still there when the mod sends a continue prompt 30 seconds after the five-hour reset. Your own message ends the pause at any time.
+- The session then pauses. 30 seconds after the five-hour reset, the mod sends a message for you that asks Claude to carry on with the work it paused. With auto-refresh on through the pause, the cache is still there, so that message does not pay for a rebuild.
+- Your own message ends the pause at any time.
 
 ## Status bar toggles
 
