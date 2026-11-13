@@ -132,6 +132,7 @@ async function setUp($: Parameters<Parameters<typeof test>[1]>[0], on: Parameter
   // Stands for the engine's own, empty band beneath the plugin.
   on('ui.render', { component: 'AbovePrompt' }, (inner, e) => inner.ui.resolve(e).Box({}))
   // The desktop app's local sessions run headless: no person at a prompt of the engine's own.
+  on('session.id', () => ({ value: 'session-a' }))
   if (isHeadless) await $.session.start({ cwd: '/tmp', surface: null, isInteractive: false })
   await $.command.run({ command: 'cache-lang', args: lang }).catch(() => undefined)
   await $.session.measure({ context: { window: 1_000_000 }, rateLimits: [] })

@@ -46,6 +46,7 @@ async function guarded($: any, on: any, setup: Setup = {}) {
 
     return { value: undefined }
   })
+  on('store.keys', () => ({ value: [...kept.keys()] }))
   mock.env(on, { CLAUDE_CODE_PROMPT_CACHE_TTL: '1h' })
   const world = {
     kept,

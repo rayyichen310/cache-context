@@ -10,7 +10,8 @@ It is a fork of [olddonkey/cache-refresher](https://github.com/olddonkey/cache-r
 - A compact button on the status bar and in the panel
 - A usage guard: near the five-hour limit Claude wraps up, the session pauses, and it continues after the reset
 - Two toggles on the status bar, for auto-refresh and the usage guard
-- The auto-refresh switch kept across restarts
+- The auto-refresh switch kept across restarts, and each session's cache countdown and open panel carried over a restart
+- `/cache-guard` to turn the usage guard on or off and set its threshold
 - A refresh refused at the usage limit waits for the reset instead of trying again every second
 
 ![The status bar above the prompt: the cache countdown, the context fill, compact, and the two toggles](docs/band.png)
@@ -36,6 +37,7 @@ On the desktop app the ring and the panel are drawn and animated. In the termina
 | `/cache-panel` | Opens the panel |
 | `/cache-ping [force]` | Refreshes the cache now. Refused when the cache has already expired, unless `force` |
 | `/cache-auto [on\|off] [max]` | Shows or changes the auto-refresh settings: on or off, and the maximum refreshes per idle period (default 12) |
+| `/cache-guard [on\|off] [threshold]` | Shows or changes the usage guard: on or off, and the five-hour usage (50–99%) at which Claude wraps up. A threshold alone turns the guard on |
 | `/cache-lang [auto\|code]` | Sets the display language by its code (for example `ja`, `de`, `pt-BR`), or goes back to matching the conversation |
 
 ## Examples
@@ -64,9 +66,10 @@ The figures are the ones `/context` shows, read locally after each main-conversa
 
 It also adds:
 
-- **A usage guard**, off until you turn it on in the panel. When the five-hour usage reaches the threshold (97% unless you change it, 50–99%) after one of Claude's replies, each tool result carries a note only Claude reads, asking it to finish the step in hand, write down its progress and the next step, and stop. After 8 more tools, or at 99%, tools are refused; the third refused call ends the turn. Once the turn ends the session is paused. With the guard's "Continue after the reset" switch on (the default), the mod sends a continue prompt 30 seconds after the five-hour reset; if that is refused, it tries again after 5 seconds, then each minute, five times at most. Auto-refresh keeps the cache alive through the pause as usual. Your own message ends the pause. With the seven-day usage used up there is no automatic continue. The panel shows the five-hour usage, the threshold, the continue switch, and while wrapping up or paused, Stop now, Not this time, Continue now and Cancel continue. The continue switch is the mod's own and does not change Claude Code's "Continue automatically at usage limit" (`autoContinueAtUsageLimit`): Claude Code lets a mod turn that setting off but not on.
+- **A usage guard**, off until you turn it on in the panel, with the Guard toggle or with `/cache-guard`. When the five-hour usage reaches the threshold (97% unless you change it, 50–99%) after one of Claude's replies, each tool result carries a note only Claude reads, asking it to finish the step in hand, write down its progress and the next step, and stop. After 8 more tools, or at 99%, tools are refused; the third refused call ends the turn. Once the turn ends the session is paused. With the guard's "Continue after the reset" switch on (the default), the mod sends a continue prompt 30 seconds after the five-hour reset; if that is refused, it tries again after 5 seconds, then each minute, five times at most. Auto-refresh keeps the cache alive through the pause as usual. Your own message ends the pause. With the seven-day usage used up there is no automatic continue. The panel shows the five-hour usage, the threshold, the continue switch, and while wrapping up or paused, Stop now, Not this time, Continue now and Cancel continue. The continue switch is the mod's own and does not change Claude Code's "Continue automatically at usage limit" (`autoContinueAtUsageLimit`): Claude Code lets a mod turn that setting off but not on.
 - **Two toggles on the status bar**, after the compact button: Refresh for auto-refresh and Guard for the usage guard. A dot before each is green when it is on, grey when it is off, and amber while it is at work. A press turns it on or off, as the panel's switch does, and both stay while Claude is replying. While the guard wraps up or pauses, its toggle says so (`Guard · wrapping up 97%`, `Guard · continues 18:30`, `Guard · paused`), and a press opens the panel instead of turning the guard off. While a refresh waits for the usage limit to reset, the Refresh toggle shows the reset time. The status bar stays on one line: when it is narrow, only the context figures are cut short.
 - **The auto-refresh switch is kept** in the mod's own store, so it stays on across restarts and updates of Claude Code and holds for later sessions until you turn it off.
+- **A restart carries each session on.** A session's cache countdown and whether its panel was open are kept in the store as they change. When Claude Code restarts or updates and the session comes back, a cache that has not yet expired is tracked and refreshed again, and the panel opens again if it was open. Records of sessions not seen for 7 days are dropped.
 - **A refresh refused at the usage limit** is not tried again before the reset and does not count against the limit you set; with no reset time given, the cache is not refreshed again until the next reply. Any other failed refresh counts as one, and the next comes at least a minute later.
 
 The panel: the context section above the cache countdown, then auto-refresh and the usage guard:
@@ -78,7 +81,7 @@ The panel: the context section above the cache countdown, then auto-refresh and 
 - **Sends**: a refresh is a request to the same model over your conversation's existing prefix, made through Claude Code (`$.model.fork`). It goes where your messages already go and nowhere else. It is sent only when you press "Refresh now", run `/cache-ping`, or have turned auto-refresh on. **Refreshes use your plan's usage or your API credit**, a little each: the cached prefix at the read price plus a few dozen tokens. A compaction is sent only when you press the compact button. With the usage guard on, the continue prompt after a pause is sent as a message of yours would be, and is marked as coming from this plugin.
 - **Reads**: the token usage of each main-conversation response; the session's context usage by category; the text of each main-conversation reply as it passes, only to count its Chinese and Latin letters; the environment variables `FORCE_PROMPT_CACHING_5M`, `CLAUDE_CODE_PROMPT_CACHE_TTL`, `ENABLE_PROMPT_CACHING_1H`, `LANG`, `LC_ALL`, and `USERPROFILE` or `HOME`; and your plan's rate-limit usage, to tell which lifetime applies and to hold refreshes back while the usage limit is reached; with the usage guard on, the five-hour usage after each reply. Of your files it only checks that a custom agent's file exists, to offer opening it. It does not read your settings files, your saved transcript or any credential.
 - **Changes**: one setting, Idle compaction (`idleCompaction` in `/config`). It is turned off while any session has auto-refresh on, and back on when the last one turns it off or ends; a session that crashed or was killed counts as ended five minutes after it was last heard from, when the next session starts or changes auto-refresh. It is changed the way `/config` changes it, in your user settings, and only when it was on; if it was off when auto-refresh came on, it stays off. If the mod is disabled or removed while it holds the setting off, turn it back on in `/config`.
-- **Stores**, in the plugin's own local store: up to 100 records of cache activity (time, token counts, model, hit or miss), whether a refresh has been seen to extend the cache, the auto-refresh switch and its limit, the language Claude last replied in, a language you set yourself, whether it turned idle compaction off, which sessions have auto-refresh on with when each was last heard from, the usage guard's switches and threshold, until when "Not this time" keeps it quiet, and for each paused session its reset and planned continue times. No message text is stored.
+- **Stores**, in the plugin's own local store: up to 100 records of cache activity (time, token counts, model, hit or miss), whether a refresh has been seen to extend the cache, the auto-refresh switch and its limit, the language Claude last replied in, a language you set yourself, whether it turned idle compaction off, which sessions have auto-refresh on with when each was last heard from, the usage guard's switches and threshold, until when "Not this time" keeps it quiet, for each paused session its reset and planned continue times, and for each session its cache countdown (times, token count, model, lifetime) and whether its panel was open. No message text is stored.
 - No network requests of its own, no telemetry, no dependencies. The only command it runs opens a memory file or custom agent in your default app when you press its ↗.
 
 ## What each hook does
@@ -87,7 +90,7 @@ The mod registers these hooks. Only the usage guard, while it is on and the five
 
 | Hook | What it does | What it changes |
 | :- | :- | :- |
-| `session.start` | Restores the auto-refresh setting you last chose, the usage guard's settings and a paused session's planned continue; starts a one-second timer that redraws the countdown, sends a refresh or the guard's continue when one is due and, while auto-refresh is on, renews this session's hold on idle compaction once a minute; turns idle compaction back on if it was left off by a session that has since ended; registers the five commands; and measures the context window | Nothing: the event is passed on as it came |
+| `session.start` | Restores the auto-refresh setting you last chose, the usage guard's settings, a paused session's planned continue, and after a restart this session's unexpired cache and open panel; starts a one-second timer that redraws the countdown, sends a refresh or the guard's continue when one is due and, while auto-refresh is on, renews this session's hold on idle compaction once a minute; keeps this session's cache and panel state in the store when either changes; turns idle compaction back on if it was left off by a session that has since ended; registers the six commands; and measures the context window | Nothing: the event is passed on as it came |
 | `session.measure` | Measures the context window again whenever Claude Code does | Nothing: the event is passed on as it came |
 | `turn.step` | For the main conversation only, reads the finished step's token usage and counts the letters of its reply; with the usage guard on, reads the five-hour usage | Nothing: every chunk and the result are passed on untouched |
 | `turn.start`, `turn.complete` | Note the main conversation's turn, so the guard can end it; when a wrapped-up turn ends, pause; when the continue's turn ends, end the pause or plan a retry | Nothing |
@@ -96,7 +99,7 @@ The mod registers these hooks. Only the usage guard, while it is on and the five
 | `classic.SessionStart` | On resume or fork, takes the time since the last response, the context size, the model and whether Claude Code counts the cache as expired, so the cache's state shows before the first turn; after compaction, forgets the old cache | Nothing: it adds no context and passes the event on |
 | `classic.PostModelSwitch` | Takes the cache lifetime Claude Code reports with the switch, and marks the tracked cache as no longer usable when the model changes | Nothing |
 | `session.end` | If auto-refresh is still on, turns it off (so the conversation after a `/clear` or a resume starts with it off) and turns idle compaction back on unless another session still has auto-refresh on | Nothing: the event is passed on as it came |
-| `command.run` | Answers its own five commands, matched by name; `/cache-auto` also turns idle compaction off or back on | Only those commands; no other command reaches it |
+| `command.run` | Answers its own six commands, matched by name; `/cache-auto` also turns idle compaction off or back on | Only those commands; no other command reaches it |
 | `ui.render` (`AbovePrompt`) | Adds the one-line status bar under what is already above the prompt | Adds its own line; leaves the rest as it was, and stands aside while a survey is shown |
 | `ui.render` (`Pane`, id `cache`) | Draws the mod's own panel | Only its own panel |
 
@@ -166,7 +169,8 @@ Each language is one file under `hooks/locales/` plus an entry in the registry i
 - 狀態列和面板上的壓縮按鈕
 - 用量保護：五小時用量快滿時讓 Claude 收尾、暫停，重置後自動繼續
 - 狀態列上的兩個快速開關：自動續期和用量保護
-- 自動續期開關在重開後保留
+- 自動續期開關在重開後保留；每個工作階段的快取倒數和面板開關狀態也會在重開後接續
+- 用 `/cache-guard` 開關用量保護、設定門檻
 - 續期遇到用量上限時等重置，不再每秒重試
 
 截圖見上方 [What this fork adds](#what-this-fork-adds)（介面語言為英文）。
@@ -174,7 +178,8 @@ Each language is one file under `hooks/locales/` plus an entry in the registry i
 - **輸入框上方的狀態列**：隨時間變短的圓環和倒數。
 - **面板**（`/cache-panel` 或狀態列上的「詳情 ›」）：倒數、已快取的 token 數、過期重建與續期一次的成本對比、損益平衡點、自動續期開關與次數上限、「立即續期」按鈕和最近幾次請求的快取命中情況。
 - **自動續期**預設關閉。開啟後，開關和次數上限存在外掛自己的儲存區，Claude Code 重開或更新後仍保持開啟，並套用到之後所有工作階段，直到你關掉。開啟後會在快取快過期時送一次續期請求，次數不超過你設的上限；已知模型價格時，總成本也不會超過一次過期多花的錢。確認續期有效之前，每段閒置期間只續期 1 次。續期遇到用量上限被拒時，會等額度重置再續，這次不算進上限；其他原因失敗算一次，下一次至少隔 1 分鐘。
-- **用量保護**預設關閉，在面板開啟。每次 Claude 回應後，五小時用量達到門檻（預設 97%，可調 50–99%），之後每個工具結果都會附一段只有 Claude 看得到的提醒，請它做完手上這一小步、寫下進度和下一步後停下。再用 8 次工具或用量到 99% 後，工具會被擋下；第 3 次被擋就結束這一輪。這一輪結束後進入暫停。面板上的「重置後自動繼續」開著時（預設開），會在五小時額度重置後 30 秒送出繼續訊息；被拒時 5 秒後重試，之後每分鐘一次，最多 5 次。暫停期間自動續期照常進行。你自己送出訊息就會結束暫停。七天用量用完時不會自動繼續。「重置後自動繼續」是本外掛自己的開關，不會改動 Claude Code 原生的「Continue automatically at usage limit」（`autoContinueAtUsageLimit`）：Claude Code 只讓 mod 關掉那個設定，不能打開。設定只在面板，沒有 `/config` 列（Claude Code 不讓 mod 改自己的 `userConfig` 列）。
+- **用量保護**預設關閉，可在面板、狀態列的「保護」開關，或用 `/cache-guard` 開啟；`/cache-guard 90` 會開啟並把門檻設為 90%，`/cache-guard off` 關閉，不加參數則顯示目前設定。每次 Claude 回應後，五小時用量達到門檻（預設 97%，可調 50–99%），之後每個工具結果都會附一段只有 Claude 看得到的提醒，請它做完手上這一小步、寫下進度和下一步後停下。再用 8 次工具或用量到 99% 後，工具會被擋下；第 3 次被擋就結束這一輪。這一輪結束後進入暫停。面板上的「重置後自動繼續」開著時（預設開），會在五小時額度重置後 30 秒送出繼續訊息；被拒時 5 秒後重試，之後每分鐘一次，最多 5 次。暫停期間自動續期照常進行。你自己送出訊息就會結束暫停。七天用量用完時不會自動繼續。「重置後自動繼續」是本外掛自己的開關，不會改動 Claude Code 原生的「Continue automatically at usage limit」（`autoContinueAtUsageLimit`）：Claude Code 只讓 mod 關掉那個設定，不能打開。設定在面板或 `/cache-guard`，沒有 `/config` 列（Claude Code 不讓 mod 改自己的 `userConfig` 列）。
+- **重開後接續**：每個工作階段的快取倒數和面板是否開著，變動時就存進外掛的儲存區。Claude Code 重開或更新、工作階段接回來後，還沒過期的快取會繼續追蹤和續期，原本開著的面板會重新打開。7 天沒出現的工作階段紀錄會被清掉。
 - 支援 43 種語言（和 Claude 桌面 app 一致），預設跟隨對話語言；也可以用 `/cache-lang` 加語言代碼手動設定。中英文以外的譯文是機器翻譯，沒有母語者校對，歡迎指正。
 - 續期請求透過 Claude Code 送到目前的模型，內容是現有對話的前綴；除此之外不發任何網路請求，也沒有遙測。只在每則回覆經過時統計中英文字元來判斷語言，不儲存回覆內容，也不讀取設定檔、對話紀錄或任何憑證。
 - **與閒置壓縮（idle compaction）的關係**：使用 1 小時快取且上下文達到 20 萬 token（由 `CLAUDE_CODE_IDLE_COMPACT_MIN_TOKENS` 設定，最低 10 萬）時，Claude Code 會在快取壽命的 90%，也就是最後一輪結束後第 54 分鐘，把閒置的對話壓縮成摘要。自動續期要等到過期前 5 分鐘（第 55 分鐘）才送出，續期也不會延後壓縮，所以只要有工作階段開著自動續期，外掛就會關閉閒置壓縮（`/config` 裡的 Idle compaction，寫入你的使用者設定），等最後一個工作階段關掉自動續期或結束時再恢復；當掉或被強制結束的工作階段，5 分鐘沒有動靜後視為已結束。只恢復外掛自己關掉的；開啟自動續期時本來就關著的不會被打開。如果在外掛關著這項設定時停用或移除外掛，請到 `/config` 手動打開。如果這項設定由專案、本機或受管設定檔決定，外掛改不了，請在那裡設定 `"idleCompaction": false`，或把 `CLAUDE_CODE_IDLE_COMPACT_MIN_TOKENS` 調到高於你的上下文大小。

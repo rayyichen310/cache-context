@@ -26,6 +26,7 @@ import {
   limitWords,
   resumeRetryMs,
 } from './limits'
+import type { LimitWords } from './limits'
 import { LANGS, MESSAGES, langFrom } from './messages'
 import type { Lang, LangSource } from './messages'
 import {
@@ -89,6 +90,9 @@ const SKIP = 'usageGuardSkip'
 // A kept pause this long past its reset belongs to a session that will not come back for it.
 const PAUSE_STALE_MS = 24 * 60 * 60_000
 const FIVE_HOURS_MS = 5 * 60 * 60_000
+// Each session's cache as last seen and whether its panel was open, one key per session, so a restart carries both on.
+const SESSION_PREFIX = 'session:'
+const SESSION_STALE_MS = 7 * 24 * 60 * 60_000
 // Prompts the person sent, from any client, or Claude Code's own continue at the reset: each ends a pause.
 const PERSON_KINDS = ['composer', 'bridge', 'sdk', 'slack-ping', 'auto-continuation']
 
@@ -138,6 +142,34 @@ let resumeTurnId: string | null = null
 let openedAt: number | undefined
 // The touch that last refilled the cache, and the share of its lifetime left before it: the ring sweeps back from there.
 let refill: { at: number; from: number } | undefined
+// This session's cache and panel as last written to the store.
+let keptText: string | undefined
+
+/** A session's cache and panel as the store kept them for a restart. */
+type KeptSession = { snap: Snapshot | null; isPaneOpen: boolean; savedAt: number }
+
+function isSnapshot(held: unknown): held is Snapshot {
+  if (typeof held !== 'object' || held === null) return false
+  const s = held as Record<string, unknown>
+
+  return (
+    typeof s.touchedAt === 'number' &&
+    typeof s.turnAt === 'number' &&
+    typeof s.pingsSinceTurn === 'number' &&
+    typeof s.cachedTokens === 'number' &&
+    typeof s.model === 'string' &&
+    (s.ttl === '5m' || s.ttl === '1h') &&
+    (s.coldReason === null || typeof s.coldReason === 'string')
+  )
+}
+
+function keptSession(held: unknown): KeptSession | null {
+  if (typeof held !== 'object' || held === null) return null
+  const { snap: s, isPaneOpen, savedAt } = held as Record<string, unknown>
+  if (typeof isPaneOpen !== 'boolean' || typeof savedAt !== 'number') return null
+
+  return { snap: isSnapshot(s) ? s : null, isPaneOpen, savedAt }
+}
 
 function isOn(value: string | undefined): boolean {
   return value === '1' || value === 'true'
@@ -629,14 +661,64 @@ async function toggleAuto($: EngineInterface): Promise<void> {
   if (idle !== null) $.ui.toast(idle)
 }
 
-/** Turns the usage guard on or off, from the panel or the band: off ends any pause, on reads the usage at once. */
+/** Changes the usage guard's settings: off ends any pause, on reads the usage at once. */
+async function switchGuard($: EngineInterface, change: (held: Guard) => Guard): Promise<Guard> {
+  const settings = await setGuard($, change)
+  if (!settings.isOn) await endPause($)
+  else await readUsage($)
+
+  return settings
+}
+
+/** Turns the usage guard on or off, from the panel or the band. */
 async function toggleGuard($: EngineInterface): Promise<void> {
-  const settings = await setGuard($, held => ({ ...held, isOn: !held.isOn }))
-  if (!settings.isOn) {
-    await endPause($)
-    return
+  await switchGuard($, held => ({ ...held, isOn: !held.isOn }))
+}
+
+/** The guard's settings, and where it stands now, as /cache-guard says them. */
+async function guardLines($: EngineInterface, w: LimitWords): Promise<string[]> {
+  const settings = await read($, guard)
+  const run = await read($, guardRun)
+  const lines = [w.guardState(settings.isOn, settings.threshold, settings.autoContinue)]
+  if (run.percent !== null) lines.push(w.guardUsed(Math.round(run.percent)))
+  if (run.phase === 'wrapping') lines.push(w.wrapping)
+  else if (run.phase === 'blocking') lines.push(w.blocking)
+  else if (run.phase === 'paused') lines.push(w.quickPaused)
+  else if (run.phase === 'resumeFailed') lines.push(w.resumeFailed)
+
+  return lines
+}
+
+/** Writes this session's cache and panel to the store when either changed, for a restart to carry on. */
+async function keepSession($: EngineInterface, held: Snapshot | null, isPaneOpen: boolean, now: number): Promise<void> {
+  const text = JSON.stringify({ snap: held, isPaneOpen })
+  if (text === keptText) return
+  keptText = text
+  await $.store.set(SESSION_PREFIX + (await $.session.id()), { snap: held, isPaneOpen, savedAt: now })
+}
+
+/**
+ * After a restart the session's state starts over: the cache it last saw comes back while it still lasts,
+ * and its panel opens again if it was open. A reload keeps both by itself. Other sessions' records go stale.
+ */
+async function restoreSession($: EngineInterface): Promise<void> {
+  const id = await $.session.id()
+  const now = await $.clock.now()
+  for (const key of await $.store.keys()) {
+    if (!key.startsWith(SESSION_PREFIX) || key === SESSION_PREFIX + id) continue
+    const other = keptSession(await $.store.get(key))
+    if (other === null || now - other.savedAt > SESSION_STALE_MS) await $.store.delete(key)
   }
-  await readUsage($)
+  const kept = keptSession(await $.store.get(SESSION_PREFIX + id))
+  if (kept === null) return
+  const cache = kept.snap
+  if (cache !== null && (await read($, snap)) === null && remainingOf(cache, now) > 0) {
+    await update($, snap, () => cache)
+  }
+  if (kept.isPaneOpen && !(await $.ui.panes()).some(pane => pane.id === PANE)) {
+    openedAt = now
+    await $.ui.open({ id: PANE, title: MESSAGES[await langOf($)].paneTitle, closeOnEscape: true })
+  }
 }
 
 async function openPane($: EngineInterface, title: string): Promise<void> {
@@ -822,19 +904,22 @@ export const register: Register = on => {
     // Held with the switch as restored. A session that ended without saying so (a crash, a kill) leaves its hold behind until it goes stale.
     void holdIdleCompaction($, (await read($, auto)).isOn)
     await restoreGuard($)
+    // Before the timer starts, so its first write finds the restored cache.
+    await restoreSession($)
     $.clock.every(1000, async () => {
       const lang = await langOf($)
       const m = MESSAGES[lang]
+      const panes = await $.ui.panes()
       // An open panel keeps the title it was opened with, so it is renamed when the language moves on.
       if (lang !== titledIn) {
         titledIn = lang
-        const panes = await $.ui.panes()
         if (panes.some(pane => pane.id === PANE && pane.title !== m.paneTitle)) {
           await $.ui.open({ id: PANE, title: m.paneTitle })
         }
       }
       const held = await read($, snap)
       const now = await $.clock.now()
+      await keepSession($, held, panes.some(pane => pane.id === PANE), now)
       await tickGuard($, now)
       // The countdown: redraw only when its words change.
       const head = held === null ? '' : remainingOf(held, now) > 0 ? fmtRemaining(remainingOf(held, now)) : 'cold'
@@ -893,6 +978,8 @@ export const register: Register = on => {
       argumentHint: m.cmdAutoHint,
       immediate: true,
     })
+    const lw = limitWords(m.tag)
+    await $.command.register({ name: 'cache-guard', description: lw.cmdGuard, argumentHint: lw.cmdGuardHint, immediate: true })
     await $.command.register({
       name: 'cache-lang',
       description: m.cmdLang,
@@ -1062,6 +1149,26 @@ export const register: Register = on => {
     const lines = [m.autoHeader, ...autoLines(m, await viewOf($)), m.autoNote]
 
     return { text: (idle === null ? lines : [...lines, `  ${idle}`]).join('\n') }
+  })
+
+  on('command.run', { command: 'cache-guard' }, async ($, e) => {
+    const w = limitWords(MESSAGES[await langOf($)].tag)
+    const words = e.args.trim().toLowerCase().split(/\s+/).filter(Boolean)
+    const wanted = words.find(word => word === 'on' || word === 'off')
+    const threshold = words.map(Number).find(n => Number.isInteger(n) && n >= MIN_THRESHOLD && n <= MAX_THRESHOLD)
+    if (words.some(word => word !== wanted && Number(word) !== threshold)) {
+      return { text: w.guardUsage(MIN_THRESHOLD, MAX_THRESHOLD) }
+    }
+    // A threshold alone turns the guard on, as a limit alone turns auto-refresh on.
+    if (words.length > 0) {
+      await switchGuard($, held => ({
+        ...held,
+        isOn: wanted === undefined ? true : wanted === 'on',
+        threshold: threshold ?? held.threshold,
+      }))
+    }
+
+    return { text: (await guardLines($, w)).join('\n') }
   })
 
   on('command.run', { command: 'cache-lang' }, async ($, e) => {

@@ -833,6 +833,7 @@ for (const lang of LANGS) {
 
       return { value: { command: e.name } }
     })
+    on('session.id', () => ({ value: 'session-a' }))
     await $.session.start({ cwd: '/tmp', surface: 'terminal', isInteractive: true })
     expect(argumentHint).toBe(MESSAGES[lang].cmdLangHint)
     const usage = await $.command.run({ command: 'cache-lang', args: 'xx' })

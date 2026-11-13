@@ -72,6 +72,11 @@ export type LimitWords = {
   quickPaused: string
   denied: string
   resumePrompt: string
+  cmdGuard: string
+  cmdGuardHint: string
+  guardUsage: (min: number, max: number) => string
+  guardState: (isOn: boolean, threshold: number, autoContinue: boolean) => string
+  guardUsed: (percent: number) => string
 }
 
 const EN: LimitWords = {
@@ -108,6 +113,12 @@ const EN: LimitWords = {
   quickPaused: 'Guard · paused',
   denied: 'The five-hour usage limit is nearly reached, so tools are paused. Write down the progress so far and the next step, then end your turn.',
   resumePrompt: 'The five-hour usage limit has reset. Continue from where you paused.',
+  cmdGuard: 'Turn the usage guard on or off, or set the five-hour usage at which Claude wraps up',
+  cmdGuardHint: '[on|off] [threshold %]',
+  guardUsage: (min, max) => `Usage: /cache-guard [on|off] [${min}-${max}]. A threshold alone turns the guard on.`,
+  guardState: (isOn, threshold, autoContinue) =>
+    `Usage guard: ${isOn ? 'on' : 'off'} · wraps up at ${threshold}% of the 5-hour usage · continue after the reset: ${autoContinue ? 'on' : 'off'}`,
+  guardUsed: percent => `5-hour usage now: ${percent}%`,
 }
 
 const ZH_HANT: LimitWords = {
@@ -144,6 +155,12 @@ const ZH_HANT: LimitWords = {
   quickPaused: '保護 · 已暫停',
   denied: '五小時用量快滿，工具已暫停使用。請直接寫下目前進度和下一步，然後結束這一輪。',
   resumePrompt: '五小時用量已重置。請從暫停前的進度繼續。',
+  cmdGuard: '開關用量保護，或設定五小時用量到多少時收尾',
+  cmdGuardHint: '[on|off] [門檻 %]',
+  guardUsage: (min, max) => `用法：/cache-guard [on|off] [${min}-${max}]。只給門檻會同時開啟保護。`,
+  guardState: (isOn, threshold, autoContinue) =>
+    `用量保護：${isOn ? '開啟' : '關閉'} · 五小時用量到 ${threshold}% 時收尾 · 重置後自動繼續：${autoContinue ? '開' : '關'}`,
+  guardUsed: percent => `目前五小時用量：${percent}%`,
 }
 
 export function limitWords(tag: string): LimitWords {

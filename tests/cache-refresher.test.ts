@@ -263,6 +263,7 @@ async function boot($: any, on: any, onInvalidate?: () => void) {
 
     return { value: undefined }
   })
+  on('session.id', () => ({ value: 'session-a' }))
   await $.session.start({ cwd: '/tmp', surface: 'terminal', isInteractive: true })
 }
 
@@ -418,6 +419,7 @@ test('the auto-refresh setting is kept for the next start', async ($, on) => {
 
     return { value: undefined }
   })
+  on('store.keys', () => ({ value: [...kept.keys()] }))
   mock.env(on, HOUR_ENV)
   on('session.usage', () => ({ value: { startedAt: START, context: { window: 1_000_000 }, rateLimits: [] } }))
 
@@ -1163,7 +1165,6 @@ function idleConfig(on: any, initial = true) {
 
     return { value: e.value }
   })
-  on('session.id', () => ({ value: 'session-a' }))
   on('session.end', (_: unknown, e: { sessionId: string }) => ({ sessionId: e.sessionId }))
 
   return config
