@@ -5,6 +5,7 @@ import { en } from '../hooks/locales/en'
 import { makeSpan } from '../hooks/locales/shared'
 import { LANGS, LOCALES, MESSAGES, langFrom } from '../hooks/messages'
 import type { Lang, Messages, Script } from '../hooks/messages'
+import { trimWords } from '../hooks/trim'
 import { STILL, cardSvg, dialSvg, historySvg, labelSvg } from '../hooks/views'
 
 type FunctionName = {
@@ -191,6 +192,14 @@ const ROOMS: Partial<Record<keyof Messages, [number, number]>> = {
   rowLapse: [14, 110], rowPing: [14, 110],
   btnOn: [13, 60], btnOff: [13, 60], btnPing: [13, 90], details: [13, 80],
 }
+
+test('the long-reply switch fits beside its button in each of its languages', () => {
+  // The same room as the auto-refresh title beside its own button, at the largest threshold.
+  for (const tag of ['en', 'zh-Hant']) {
+    const text = trimWords(tag).label('200k')
+    expect(estimateWidth(text, 14)).toBeLessThanOrEqual(200)
+  }
+})
 
 test('every registered catalog has the English shape and a distinct name', () => {
   expect(LANGS[0]).toBe('en')
@@ -871,8 +880,8 @@ for (const lang of LANGS) {
     const paneDrawings = await pane.findAll({ type: 'Svg' })
     // The cache's ring and the two quick toggles' dots.
     expect(bandDrawings).toHaveLength(3)
-    // Splitting the card into ring, figure and costs adds two drawings; the usage guard's rule and title two more.
-    expect(paneDrawings).toHaveLength(11)
+    // Splitting the card into ring, figure and costs adds two drawings; the long-reply switch one; the usage guard's rule and title two more.
+    expect(paneDrawings).toHaveLength(12)
     for (const drawing of [...bandDrawings, ...paneDrawings]) {
       const source = String(drawing.props.source)
       const m = MESSAGES[lang]

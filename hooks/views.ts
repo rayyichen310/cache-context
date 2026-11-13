@@ -9,6 +9,7 @@ import type { LimitWords } from './limits'
 import { MESSAGES } from './messages'
 import type { Messages } from './messages'
 import { LEAD_MS, budgetOf, costsOf, isTracked, remainingOf } from './model'
+import { trimWords } from './trim'
 import type { Verdict, View } from './model'
 
 type Els = Elements['terminal'] | Elements['desktop']
@@ -79,6 +80,7 @@ export type PaneHandlers = {
   onCapDown: () => void
   onCapUp: () => void
   onPing: () => void
+  onTrim: () => void
 }
 
 /** The usage guard as a draw needs it: its settings and where it stands. */
@@ -899,6 +901,11 @@ export function paneView(
       }),
     ]),
     between([words(plan, 'body'), stepper]),
+    // Whether a long last reply is cached by one short message before the first refresh.
+    between([
+      words(trimWords(m.tag).label(fmtTokens(policy.trimFrom)), 'body'),
+      Button({ key: 'trim-toggle', label: policy.trim ? m.btnOff : m.btnOn, variant: 'secondary', onPress: handlers.onTrim }),
+    ]),
   ]
 
   // How the cache has held, beside the button that pings now; under it, what the last press did and the price basis.

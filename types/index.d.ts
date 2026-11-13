@@ -40,6 +40,10 @@ export type Auto = {
   isOn: boolean
   /** The most pings one idle stretch may spend, before the break-even count lowers it. */
   cap: number
+  /** Whether a long last reply is cached by one short message in the main conversation before the first refresh. */
+  trim: boolean
+  /** The last reply's output tokens from which that message is sent. */
+  trimFrom: number
 }
 
 /** One /context category, estimated locally. */

@@ -10,6 +10,8 @@ A compaction is sent only when you press the compact button.
 
 With the usage guard on, the continue prompt after a pause is sent as a message of yours would be, and is marked as coming from this plugin.
 
+With "Message first if reply ≥ 2k" on, the first auto-refresh after a long reply is a short message sent the same way, also marked as coming from this plugin, which asks Claude to answer "ok". It and the answer stay in your conversation.
+
 The mod makes no network requests of its own, has no telemetry and no dependencies. The only command it runs opens a memory file or custom agent in your default app when you press its ↗.
 
 ## Reads
@@ -35,7 +37,7 @@ In the plugin's own local store:
 
 - Up to 100 records of cache activity: time, token counts, model, hit or miss.
 - Whether a refresh has been seen to extend the cache.
-- The auto-refresh switch and its limit.
+- The auto-refresh switch and its limit, and the long-reply switch and its threshold.
 - The language Claude last replied in, and a language you set yourself.
 - Whether it turned idle compaction off, and which sessions have auto-refresh on with when each was last heard from.
 - The usage guard's switches and threshold, until when "Not this time" keeps it quiet, and for each paused session its reset and planned continue times.

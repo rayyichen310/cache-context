@@ -44,6 +44,7 @@ import {
 } from './model'
 import type { Extension, Observation, Verdict, View } from './model'
 import { autoLines, report } from './report'
+import { DEFAULT_TRIM_FROM, MAX_TRIM_FROM, MIN_TRIM_FROM, TRIM_DENIED, TRIM_PROMPT, trimWords } from './trim'
 import { bandView, paneView } from './views'
 import type { ContextPart, Motion } from './views'
 
@@ -56,6 +57,8 @@ const snap = atom({ plugin: 'cache-context', key: 'snapshot' } as const, null)
 const auto = atom({ plugin: 'cache-context', key: 'auto' } as const, {
   isOn: false,
   cap: DEFAULT_CAP,
+  trim: false,
+  trimFrom: DEFAULT_TRIM_FROM,
 })
 
 const context = atom({ plugin: 'cache-context', key: 'context' } as const, null)
@@ -100,6 +103,8 @@ type TtlChoice = Pick<Snapshot, 'ttl' | 'ttlSource'>
 
 // How long an automatic refresh waits after one that failed for any reason but the usage limit.
 const RETRY_MS = 60_000
+// How long a long-reply message may wait for its turn before the refresh goes out by fork instead.
+const TRIM_WAIT_MS = 2 * 60_000
 
 /** What a ping said; `failure` when a request went out and refreshed nothing: refused at the usage limit, or else. */
 type PingResult = { text: string; verdict: Verdict | null; failure?: 'limit' | 'other' }
@@ -144,6 +149,11 @@ let openedAt: number | undefined
 let refill: { at: number; from: number } | undefined
 // This session's cache and panel as last written to the store.
 let keptText: string | undefined
+// The long-reply message: when it went out, until its turn starts; the turn it started, until it ends; and
+// whether this idle period has sent one, so it goes out once until the person's next message.
+let trimSentAt: number | null = null
+let trimTurnId: string | null = null
+let hasTrimmed = false
 
 /** A session's cache and panel as the store kept them for a restart. */
 type KeptSession = { snap: Snapshot | null; isPaneOpen: boolean; savedAt: number }
@@ -302,12 +312,14 @@ async function learnExtension($: EngineInterface, ttl: Ttl, doesExtend: boolean)
 /** The auto-refresh setting the store kept; null when none was kept or the value is not one. */
 function keptAuto(held: unknown): Auto | null {
   if (typeof held !== 'object' || held === null) return null
-  const { isOn, cap } = held as Record<string, unknown>
+  const { isOn, cap, trim, trimFrom } = held as Record<string, unknown>
   if (typeof isOn !== 'boolean' || typeof cap !== 'number' || !Number.isInteger(cap) || cap < 1 || cap > MAX_CAP) {
     return null
   }
+  // A setting kept before the long-reply switch existed has it off.
+  const isTrimFrom = typeof trimFrom === 'number' && Number.isInteger(trimFrom) && trimFrom >= MIN_TRIM_FROM && trimFrom <= MAX_TRIM_FROM
 
-  return { isOn, cap }
+  return { isOn, cap, trim: trim === true, trimFrom: isTrimFrom ? trimFrom : DEFAULT_TRIM_FROM }
 }
 
 // Idle compaction runs at 90% of a one-hour cache's lifetime, before an auto-refresh would go out, so it is off while any session has auto-refresh on.
@@ -933,9 +945,13 @@ export const register: Register = on => {
       const policy = await read($, auto)
       if (policy.isOn && now - heldBeatAt >= HOLD_BEAT_MS) void holdIdleCompaction($, true)
 
-      // The keep-alive. A request under way has already touched the cache.
-      if (held === null || pingAt !== null || inFlight > 0) return
+      // The keep-alive. A request under way has already touched the cache, as has the long-reply message's turn.
+      if (held === null || pingAt !== null || inFlight > 0 || trimTurnId !== null) return
       if (!policy.isOn) return
+      if (trimSentAt !== null) {
+        if (now - trimSentAt < TRIM_WAIT_MS) return
+        trimSentAt = null
+      }
       const remaining = remainingOf(held, now)
       if (remaining <= PING_MARGIN_MS || remaining > LEAD_MS[held.ttl]) return
       const budget = budgetOf(held, policy.cap, await knownExtension($))
@@ -954,6 +970,20 @@ export const register: Register = on => {
       if (isPastLimit(before)) {
         $.ui.log(await holdForLimit(before))
         return
+      }
+      const tail = held.tailTokens ?? 0
+      if (policy.trim && !hasTrimmed && tail >= policy.trimFrom && (await read($, guardRun)).phase === 'watching') {
+        // In place of this refresh, a turn of the main conversation puts the long reply into its own cache.
+        hasTrimmed = true
+        trimSentAt = now
+        const entered = await $.prompt.submit({ text: TRIM_PROMPT }).catch(() => ({ drop: 'failed' }))
+        if (entered.drop === undefined) {
+          const sentLine = trimWords(m.tag).sent(fmtTokens(tail))
+          $.ui.status(sentLine)
+          $.ui.log(sentLine, { to: 'debug' })
+          return
+        }
+        trimSentAt = null
       }
       const sent = await ping($, false)
       const line = m.autoLog(held.pingsSinceTurn + 1, budget, sent.text)
@@ -983,7 +1013,7 @@ export const register: Register = on => {
     await $.command.register({
       name: 'cache-auto',
       description: m.cmdAuto,
-      argumentHint: m.cmdAutoHint,
+      argumentHint: `${m.cmdAutoHint} | ${trimWords(m.tag).hint}`,
       immediate: true,
     })
     const lw = limitWords(m.tag)
@@ -1039,6 +1069,10 @@ export const register: Register = on => {
   on('turn.start', async ($, e, next) => {
     if (e.agentId === undefined) {
       mainTurnId = e.turnId
+      if (trimSentAt !== null) {
+        trimTurnId = e.turnId
+        trimSentAt = null
+      }
       if ((await read($, guardRun)).isResuming && resumeTurnId === null) resumeTurnId = e.turnId
     }
 
@@ -1047,6 +1081,7 @@ export const register: Register = on => {
 
   on('turn.complete', async ($, e, next) => {
     const result = await next(e)
+    if (e.turnId === trimTurnId) trimTurnId = null
     if (e.agentId === undefined) await settleTurn($, e.turnId, e.reason)
 
     return result
@@ -1055,6 +1090,8 @@ export const register: Register = on => {
   // Wrapping up: each tool still runs, its result carrying a reminder only Claude reads, until the grace is
   // used or the usage reaches 99%. Then every call is refused, and the third refusal ends the turn.
   on('tool.call', async ($, e, next) => {
+    // The long-reply message's turn only answers it.
+    if (trimTurnId !== null && mainTurnId === trimTurnId) return { deny: TRIM_DENIED }
     const run = await read($, guardRun)
     if (run.phase !== 'wrapping' && run.phase !== 'blocking') return next(e)
     if (run.phase === 'wrapping' && run.toolsUsed < GRACE_TOOLS) {
@@ -1073,8 +1110,9 @@ export const register: Register = on => {
 
   on('prompt.submit', async ($, e, next) => {
     if (PERSON_KINDS.includes(e.origin.kind)) {
-      // The last automatic refresh is old news once the person is back.
+      // The last automatic refresh is old news once the person is back, and a new idle period may send its own message.
       $.ui.status(undefined)
+      hasTrimmed = false
       const { phase } = await read($, guardRun)
       if (phase === 'paused' || phase === 'resumeFailed') await endPause($)
     }
@@ -1146,17 +1184,31 @@ export const register: Register = on => {
   on('command.run', { command: 'cache-auto' }, async ($, e) => {
     const m = MESSAGES[await langOf($)]
     const words = e.args.trim().split(/\s+/).filter(Boolean)
+    const tw = trimWords(m.tag)
+    if (words[0] === 'trim') {
+      const rest = words.slice(1)
+      const wantedTrim = rest.find(word => word === 'on' || word === 'off')
+      const from = rest.map(Number).find(n => Number.isInteger(n) && n >= MIN_TRIM_FROM && n <= MAX_TRIM_FROM)
+      if (rest.some(word => word !== wantedTrim && Number(word) !== from)) return { text: tw.usage(MIN_TRIM_FROM, MAX_TRIM_FROM) }
+      // Tokens alone, or the word alone, turn it on.
+      const idle = await setAuto($, now => ({ ...now, trim: wantedTrim !== 'off', trimFrom: from ?? now.trimFrom }))
+      const policy = await read($, auto)
+
+      return { text: [tw.state(policy.trim, fmtTokens(policy.trimFrom)), ...(idle === null ? [] : [`  ${idle}`])].join('\n') }
+    }
     const wanted = words.find(word => word === 'on' || word === 'off')
     const cap = words.map(Number).find(n => Number.isInteger(n) && n > 0 && n <= MAX_CAP)
     if (words.length > 0 && wanted === undefined && cap === undefined) return { text: m.autoUsage(MAX_CAP) }
     const idle =
       words.length > 0
         ? await setAuto($, now => ({
+            ...now,
             isOn: wanted === undefined ? true : wanted === 'on',
             cap: cap ?? now.cap,
           }))
         : null
-    const lines = [m.autoHeader, ...autoLines(m, await viewOf($)), m.autoNote]
+    const policy = await read($, auto)
+    const lines = [m.autoHeader, ...autoLines(m, await viewOf($)), tw.state(policy.trim, fmtTokens(policy.trimFrom)), m.autoNote]
 
     return { text: (idle === null ? lines : [...lines, `  ${idle}`]).join('\n') }
   })
@@ -1227,6 +1279,9 @@ export const register: Register = on => {
       onPing: async () => {
         lastAction = (await ping($, false)).text
         $.ui.invalidate('ui.render')
+      },
+      onTrim: () => {
+        void setAuto($, held => ({ ...held, trim: !held.trim }))
       },
     }, e.props.bodyColumns, await motionOf($), ctx, {
       settings: await read($, guard),

@@ -37,6 +37,7 @@ When you know you will be away, auto-refresh sends one small request shortly bef
 - Until a refresh has been seen to keep the cache alive, it sends only one per idle period, and the panel shows the count as `0/1`. Your next message resets the count.
 - It stays on when Claude Code updates or restarts, and a cache that has not yet expired goes on being refreshed. Only you turn it off.
 - The latest refresh that worked shows on the status line under the prompt, replacing the one before, and your next message clears it. A refresh that failed or missed the cache is written into the transcript.
+- After a long reply, each refresh writes that reply into the cache again. With "Message first if reply ≥ 2k" on in the panel (or `/cache-auto trim`), the first refresh is replaced by one short message in the conversation, which Claude answers with "ok". The message and its answer stay in the transcript. The long reply is then cached with the conversation, and the refreshes after it write only the short answer. Off by default; `/cache-auto trim 3000` sets the threshold.
 - While it is on, the mod turns off Claude Code's idle compaction, which would otherwise compact a long conversation before the first refresh. It turns the setting back on afterwards.
 
 To extend the cache once, for example before a meeting, press "Refresh now" or run `/cache-ping`. The reply says how many tokens were read from the cache and what the refresh cost, and the countdown starts over.
@@ -94,6 +95,7 @@ The status bar appears after the first response of a session, once at least 1,02
 | `/cache-panel` | Opens the panel |
 | `/cache-ping [force]` | Refreshes the cache now. Refused when the cache has already expired, unless `force` |
 | `/cache-auto [on\|off] [max]` | Shows or changes the auto-refresh settings: on or off, and the maximum refreshes per idle period (default 12) |
+| `/cache-auto trim [on\|off] [tokens]` | Turns the short message before refreshing a long reply on or off, and sets the reply length that triggers it (default 2,000 tokens, 500–200,000). Tokens alone turn it on |
 | `/cache-guard [on\|off] [threshold]` | Shows or changes the usage guard: on or off, and the five-hour usage (50–99%) at which Claude wraps up. A threshold alone turns the guard on |
 | `/cache-lang [auto\|code]` | Sets the display language by its code (for example `ja`, `de`, `pt-BR`), or goes back to matching the conversation |
 
@@ -101,7 +103,7 @@ The mod follows the language Claude replies in, in 43 languages. Apart from Engl
 
 ## What it sends, changes and stores
 
-- **Sends** only through your own conversation: a refresh when you ask for one or auto-refresh is on, a compaction when you press compact, and the guard's continue prompt. **Refreshes use your plan's usage or your API credit**, a little each. No network requests of its own, no telemetry, no dependencies.
+- **Sends** only through your own conversation: a refresh when you ask for one or auto-refresh is on, the short message before refreshing a long reply when you turn that on, a compaction when you press compact, and the guard's continue prompt. **Refreshes use your plan's usage or your API credit**, a little each. No network requests of its own, no telemetry, no dependencies.
 - **Changes** one setting, Idle compaction, and only while auto-refresh is on. If the mod is disabled or removed while it holds the setting off, turn it back on in `/config`.
 - **Stores** cache activity, its own switches and per-session state in the plugin's local store. No message text is stored, and it does not read your settings files, your saved transcript or any credential.
 

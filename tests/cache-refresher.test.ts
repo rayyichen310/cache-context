@@ -500,9 +500,9 @@ test('the auto-refresh setting is kept for the next start', async ($, on) => {
 
   await boot($, on)
   await $.command.run({ command: 'cache-auto', args: 'on 5' })
-  expect(kept.get('auto')).toEqual({ isOn: true, cap: 5 })
+  expect(kept.get('auto')).toEqual({ isOn: true, cap: 5, trim: false, trimFrom: 2000 })
   await $.command.run({ command: 'cache-auto', args: 'off' })
-  expect(kept.get('auto')).toEqual({ isOn: false, cap: 5 })
+  expect(kept.get('auto')).toEqual({ isOn: false, cap: 5, trim: false, trimFrom: 2000 })
 })
 
 test('a kept auto-refresh setting is in force from the start', async ($, on) => {
@@ -801,6 +801,12 @@ test('the panel draws the dial, sets a lapse against a ping, and its buttons dri
   expect(await term.find({ type: 'Text', text: 'Trial 0/1, up to 12 if it works' })).toBeDefined()
   await term.press({ key: 'cap-up' })
   expect(await term.find({ type: 'Text', text: '13' })).toBeDefined()
+  // Beneath it, the long-reply switch with its threshold, off until pressed.
+  expect(await term.find({ type: 'Text', text: 'Message first if reply ≥ 2k' })).toBeDefined()
+  expect((await term.find({ key: 'trim-toggle' }))?.text).toContain('Turn on')
+  await term.press({ key: 'trim-toggle' })
+  expect((await term.find({ key: 'trim-toggle' }))?.text).toContain('Turn off')
+  await term.press({ key: 'trim-toggle' })
 
   // A ping from the panel restarts the hour and spends the one unproven ping.
   await term.press({ key: 'ping' })
@@ -814,8 +820,8 @@ test('the panel draws the dial, sets a lapse against a ping, and its buttons dri
   // The desktop: everything that is read is drawn in one type, at the sizes measured on the app; only buttons are the app's own.
   const desk = await $.ui.mount({ plugin: 'cache-context', surface: 'desktop', component: 'Pane', requestId: 'cache', props })
   const drawings = await desk.findAll({ type: 'Svg' })
-  // Three drawings for the card instead of one, the same six for the controls and footer, then the usage guard's rule and title.
-  expect(drawings).toHaveLength(11)
+  // Three drawings for the card instead of one, the same seven for the controls and footer, then the usage guard's rule and title.
+  expect(drawings).toHaveLength(12)
   expect(drawings[0]!.props.width).toBe(60)
   expect(drawings[0]!.props.height).toBe(60)
   expect(String(drawings[0]!.props.source)).not.toContain('<text')
@@ -842,6 +848,7 @@ test('the panel draws the dial, sets a lapse against a ping, and its buttons dri
   expect(drawn).toContain('>Auto-refresh while away</text>')
   expect(drawn).toContain('>None left until next message</text>')
   expect(drawn).toContain('>12</text>')
+  expect(drawn).toContain('>Message first if reply ≥ 2k</text>')
   expect(drawn).toContain('>Last request hit</text>')
   expect(drawn).toContain('>Estimates at API list prices</text>')
   // Every drawing says what it is: one without an alt is not drawn.
@@ -1360,5 +1367,5 @@ test('a conversation ending turns its own auto-refresh off but keeps the chosen 
   await $.session.end({ reason: 'clear', sessionId: 'session-a' })
   expect(config.idle).toBe(true)
   expect((await $.command.run({ command: 'cache-auto', args: '' })).text).toContain('Auto-refresh: off')
-  expect(kept.get('auto')).toEqual({ isOn: true, cap: 5 })
+  expect(kept.get('auto')).toEqual({ isOn: true, cap: 5, trim: false, trimFrom: 2000 })
 })
