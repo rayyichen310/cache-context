@@ -14,7 +14,15 @@ Everything shows on a one-line status bar above the prompt. Press "Details ›" 
 
 ![The cache countdown with the cost of an expiry next to the cost of one refresh](docs/panel-cache.png)
 
-Claude Code keeps your conversation in a prompt cache for five minutes or one hour after its last use. While the cache holds, each message reads the conversation from it at about a tenth of the normal input price. Once it expires, your next message writes the whole conversation into the cache again, at 1.25 times the normal input price for the five-minute cache and 2 times for the one-hour cache. In the screenshot, rebuilding the cache after it expires would cost $1.76, while one refresh that keeps it alive costs $0.045.
+Claude Code keeps your conversation in a prompt cache for five minutes or one hour after its last use. Each message sends the conversation so far to the model, and what that costs depends on the cache. Taking the model's normal input price as 1:
+
+| How the message handles the conversation so far | Price |
+| :- | :- |
+| The cache holds: read it from the cache | 0.1 (most models; 0.05 on Opus 5.5) |
+| For comparison: sent as normal input | 1 |
+| The cache expired: write it into the cache again | 1.25 for the five-minute cache, 2 for the one-hour cache |
+
+In the screenshot the conversation is about 220k tokens on Opus 5.5 (normal input $4 per million tokens) with the one-hour cache. Rebuilding it after an expiry costs 220k × $4 × 2 ≈ $1.76. One refresh only reads the cache, 220k × $4 × 0.05 ≈ $0.044, plus a few dozen tokens for the request itself: $0.045.
 
 The ring drains with the time left, and the panel puts the cost of letting the cache expire next to the cost of keeping it alive with one refresh. Run `/cache-status` for the same figures in text.
 
