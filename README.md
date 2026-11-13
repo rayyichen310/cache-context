@@ -39,8 +39,6 @@ Off by default. When it is on, the mod sends one small request shortly before th
 - It stays on across restarts until you turn it off.
 - While it is on, the mod turns off Claude Code's idle compaction, which would otherwise compact a long conversation before the first refresh. It turns the setting back on afterwards.
 
-Turn it on with Refresh on the status bar, "Turn on" in the panel, or `/cache-auto on`. "Refresh now" or `/cache-ping` refreshes once by hand.
-
 ### Context window
 
 ![The context section: share of the window in use, tokens left before auto-compaction, and the compact button](docs/panel-context.png)
@@ -53,13 +51,18 @@ A second ring on the status bar shows how much of the context window is in use. 
 
 Off by default. When the five-hour usage reaches the threshold (97% unless you change it), the guard asks Claude to finish the step in hand, write down its progress and stop. The session then pauses, and 30 seconds after the five-hour reset the mod sends a continue prompt. Your own message ends the pause at any time.
 
-Turn it on with Guard on the status bar, the panel, or `/cache-guard on`.
-
 ### Status bar toggles
 
 The Refresh and Guard toggles show their state with a dot: green on, grey off, amber at work. While the guard wraps up or pauses, its toggle says so (`Guard · wrapping up 97%`, `Guard · continues 18:30`, `Guard · paused`), and a press opens the panel instead of turning the guard off.
 
 The rules behind each feature, such as how the cache lifetime is detected, when refreshes stop, and what the guard does step by step, are in [How it works](docs/how-it-works.md).
+
+## Examples
+
+- **See what stepping away costs.** After a long turn, run `/cache-status`. It prints how long the cache has left, how many tokens it holds, and what rebuilding them would cost next to the cost of one refresh.
+- **Keep the cache active over lunch.** Run `/cache-auto on 12`, press Refresh on the status bar, or press "Turn on" in the panel. The panel shows the count as `0/1` until a refresh has been seen to work and then up to your limit, and estimates how long the cache can be kept. Your next message resets the count.
+- **Extend the cache before a meeting.** Run `/cache-ping`, or press "Refresh now" in the panel. The reply says how many tokens were read from the cache and what the refresh cost, and the countdown starts over.
+- **Let a long task stop cleanly at the usage limit.** Run `/cache-guard on`, or press Guard on the status bar or "Turn on" in the panel's usage guard section. At 97% of the five-hour usage Claude wraps up, the session pauses, and it continues after the reset.
 
 ## Install
 
