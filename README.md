@@ -35,7 +35,7 @@ When you know you will be away, auto-refresh sends one small request shortly bef
 - Turn it on with Refresh on the status bar, "Turn on" in the panel, or `/cache-auto on 12`.
 - It stops at the limit you set (12 per idle period unless you change it), and before the refreshes would cost more than one rebuild. The panel estimates how long the cache can be kept.
 - Until a refresh has been seen to keep the cache alive, it sends only one per idle period, and the panel shows the count as `0/1`. Your next message resets the count.
-- It stays on across restarts until you turn it off.
+- It stays on when Claude Code updates or restarts, and a cache that has not yet expired goes on being refreshed. Only you turn it off.
 - While it is on, the mod turns off Claude Code's idle compaction, which would otherwise compact a long conversation before the first refresh. It turns the setting back on afterwards.
 
 To extend the cache once, for example before a meeting, press "Refresh now" or run `/cache-ping`. The reply says how many tokens were read from the cache and what the refresh cost, and the countdown starts over.
@@ -50,15 +50,15 @@ Once the context window fills, Claude Code compacts the conversation on its own.
 - Under "Legend", each category's share, and the MCP tools, memory files and custom agents in context; ↗ opens a memory file or agent in your default app.
 - "Compact session", here and on the status bar, does what `/compact` does, when you choose.
 
-## Stop cleanly at the usage limit — Usage guard
+## Stop before the usage runs out, and keep the cache — Usage guard
 
-When the five-hour usage limit is reached in the middle of a task, Claude stops wherever it happens to be. The usage guard stops it a little earlier, at a point you can pick up from. It is off by default.
+Once the five-hour usage runs out, refreshes are refused too, so the cache expires while you wait for the reset, and your first message after it pays for the rebuild. The usage guard has Claude wrap up and pause before the usage runs out (at 97% unless you change it), which leaves a little usage for auto-refresh to keep the cache alive until after the reset. It is off by default.
 
 ![The usage guard: five-hour usage, the wrap-up threshold and the continue switch](docs/panel-guard.png)
 
 - Turn it on with Guard on the status bar, "Turn on" in the panel, or `/cache-guard on`.
 - When the five-hour usage reaches the threshold (97% unless you change it), the guard asks Claude to finish the step in hand, write down its progress and stop.
-- The session then pauses, and 30 seconds after the five-hour reset the mod sends a continue prompt. Your own message ends the pause at any time.
+- The session then pauses; with auto-refresh on, the cache goes on being refreshed through the pause, so it is still there when the mod sends a continue prompt 30 seconds after the five-hour reset. Your own message ends the pause at any time.
 
 ## Status bar toggles
 
