@@ -28,6 +28,11 @@ export type Snapshot = {
   /** Why the cache is unusable whatever the clock says, or null. */
   coldReason: string | null
   lastPing: PingUsage | null
+  /**
+   * Output tokens of the main conversation's last reply. A ping replays the last request with that reply after it,
+   * and writes the reply to the cache each time. Absent in records kept before it was tracked, and after a resume.
+   */
+  tailTokens?: number
 }
 
 /** The auto keep-alive switch: off until the person turns it on, then kept in the store across restarts. */

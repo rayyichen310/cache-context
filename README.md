@@ -22,7 +22,7 @@ The ring on the status bar drains with the time the cache has left. The panel pu
 
 ![The cache countdown with the cost of an expiry next to the cost of one refresh](docs/panel-cache.png)
 
-In the screenshot the conversation is about 220k tokens on Opus 5.5 (normal input $4 per million tokens) with the one-hour cache. Rebuilding it after an expiry costs 220k × $4 × 2 ≈ $1.76. One refresh only reads the cache, 220k × $4 × 0.05 ≈ $0.044, plus a few dozen tokens for the request itself: $0.045.
+For example, take a conversation of 92k tokens on Opus 5.5 (normal input $4 per million tokens) with the one-hour cache, whose last reply from Claude was 5k tokens long. Rebuilding the cache after an expiry costs 92k × $4 × 2 ≈ $0.74. One refresh reads the cache, 92k × $4 × 0.05 ≈ $0.018, and also writes Claude's last reply into the cache again, 5k × $4 × 2 ≈ $0.042: about $0.061 with the request's own few dozen tokens. After a short last reply, a refresh costs much less.
 
 After a long turn, run `/cache-status` to get the same figures in text: how long the cache has left, how many tokens it holds, and both costs. Dollar figures use API list prices; on a subscription they are an equivalent, not a charge.
 

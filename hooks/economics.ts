@@ -37,7 +37,7 @@ export function priceOf(model: string): Price | null {
 }
 
 export type Economics = {
-  /** One keep-alive: the cache read plus the ping's own tokens. */
+  /** One keep-alive: the cache read, the last reply it writes again, and the ping's own tokens. */
   pingUsd: number
   /** Re-writing the whole prefix after a lapse. */
   rewriteUsd: number
@@ -53,12 +53,14 @@ export function economics(
   price: Price,
   ttl: Ttl,
   cachedTokens: number,
-  overhead: { input: number; output: number } = DEFAULT_PING_OVERHEAD,
+  overhead: { input: number; output: number; written?: number } = DEFAULT_PING_OVERHEAD,
 ): Economics {
   const perToken = price.input / 1e6
   const readUsd = cachedTokens * perToken * price.read
   const rewriteUsd = cachedTokens * perToken * WRITE_MULTIPLIER[ttl]
-  const pingUsd = readUsd + overhead.input * perToken + (overhead.output * price.output) / 1e6
+  // The written tokens are priced at this cache's write rate, as a ping's own report prices them.
+  const writtenUsd = (overhead.written ?? 0) * perToken * WRITE_MULTIPLIER[ttl]
+  const pingUsd = readUsd + writtenUsd + overhead.input * perToken + (overhead.output * price.output) / 1e6
   const lapseUsd = rewriteUsd - readUsd
   const ratio = pingUsd > 0 ? lapseUsd / pingUsd : 0
 

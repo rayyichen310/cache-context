@@ -12,7 +12,9 @@ Only the main conversation is tracked; subagents keep caches of their own. After
 
 ## When a refresh pays off
 
-A refresh reads the cached prefix at the cache-read price `r`, plus a few dozen tokens for the request itself. After an expiry the prefix is written again at the cache-write price `w`, which is `w − r` more than a hit would have cost. Refreshes are worth sending while their total stays under that difference, which gives at most about `(w − r) / r` refreshes in a row. A refresh pays off whenever the chance you come back within its window is above about `r / (w − r)`; for most models that is a few percent. `/cache-status` shows both numbers for your model and cache size.
+A refresh replays the conversation's last request with Claude's last reply after it. It reads the cached prefix at the cache-read price `r`, writes that last reply into the cache at the cache-write price `w`, and adds a few dozen tokens for the request itself. Every refresh recorded so far has written the reply again, even one sent 55 minutes after the refresh before it, so the mod counts the reply in every refresh: the reply's length is the output tokens of Claude's last reply.
+
+After an expiry the prefix is written again at `w`, which is `w − r` per token more than a hit would have cost. Call one refresh's cost `p` and that difference over the whole prefix `L`. Refreshes are worth sending while their total stays under `L`, which gives at most about `L / p` refreshes in a row. A refresh pays off whenever the chance you come back within its window is above about `p / L`. `/cache-status` shows both numbers for your model, cache size and last reply.
 
 Dollar figures are computed at API list prices. On a subscription they are an equivalent, not a charge.
 

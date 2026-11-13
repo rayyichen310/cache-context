@@ -797,6 +797,7 @@ async function recordStep(
     ttlSource,
     coldReason: null,
     lastPing: previous?.lastPing ?? null,
+    tailTokens: usage.output_tokens,
   }))
   $.ui.invalidate('ui.render')
 }

@@ -312,6 +312,39 @@ function forkHit() {
   return { value: { isAnswered: true, text: 'ok', usage: { input_tokens: 40, output_tokens: 200, cache_read_input_tokens: 80_000, cache_creation_input_tokens: 0 } } }
 }
 
+// Figures from a real session: the last turn read 90,970 and wrote 1,291 with a 5,257-token reply,
+// and every refresh after it read 92,261 and wrote those 5,257 again.
+test('a refresh is priced with the last reply it writes to the cache again', { timeoutMs: 30_000 }, async ($, on) => {
+  mock.clock(on, { now: START })
+  mock.store(on)
+  mock.env(on, HOUR_ENV)
+  on('session.usage', usageWith([]))
+  const model = 'claude-opus-5-5'
+  on('turn.step', async function* (_, e) {
+    return {
+      turnId: e.turnId,
+      index: e.index,
+      answer: 'hi',
+      toolUses: [],
+      stopReason: 'end_turn',
+      usage: { input_tokens: 2, output_tokens: 5_257, cache_read_input_tokens: 90_970, cache_creation_input_tokens: 1_291, model },
+    }
+  })
+  on('model.fork', () => ({
+    value: { isAnswered: true, text: 'ok', usage: { input_tokens: 40, output_tokens: 4, cache_read_input_tokens: 92_261, cache_creation_input_tokens: 5_257 } },
+  }))
+  await boot($, on)
+  const step = $.turn.step({ turnId: 't1', index: 0, model, messageCount: 1 })
+  for await (const _ of step) void _
+  await step.result
+
+  const ping = await $.command.run({ command: 'cache-ping', args: '' })
+  expect(ping.text).toContain('$0.061')
+  const status = await $.command.run({ command: 'cache-status', args: '' })
+  // 92,261 read at 0.05 + 5,257 written at 2 + 40 in + 4 out, at $4 / $20 per million: the cost the refresh itself reported.
+  expect(status.text).toContain('  One refresh: about $0.061 (token overhead measured). Up to 11 in a row cost less than one rebuild')
+})
+
 test('the band and card distinguish a model switch from the lifetime running out', { timeoutMs: 30_000 }, async ($, on) => {
   const clock = mock.clock(on, { now: START })
   mock.store(on)
@@ -421,7 +454,7 @@ test('a small cache with no worthwhile refreshes explains the costs and plan', {
   expect(status.text).not.toContain('0 of 0')
   expect(status.text).not.toContain('used up')
   expect(status.text).not.toContain('  Effect:')
-  expect(status.text).toContain('  One refresh: about $0.0063 (token overhead measured). That is more than an expiry would add, so refreshing does not pay off')
+  expect(status.text).toContain('  One refresh: about $0.0070 (token overhead measured). That is more than an expiry would add, so refreshing does not pay off')
   expect(status.text).not.toContain('Up to 0 in a row')
   expect(status.text).not.toContain('Rule of thumb')
 })
@@ -754,8 +787,9 @@ test('the panel draws the dial, sets a lapse against a ping, and its buttons dri
   expect((await term.find({ type: 'Text', text: '52m' }))?.props.bold).toBe(true)
   expect(await term.find({ type: 'Text', text: 'left · 180k tokens cached' })).toBeDefined()
   expect(await term.find({ type: 'Text', text: '$3.60' })).toBeDefined()
-  expect(await term.find({ type: 'Text', text: '$0.048' })).toBeDefined()
-  expect(await term.find({ type: 'Text', text: '73 refreshes ≈ 1 rebuild' })).toBeDefined()
+  // A ping also writes the 300-token last reply again, at the one-hour write rate.
+  expect(await term.find({ type: 'Text', text: '$0.054' })).toBeDefined()
+  expect(await term.find({ type: 'Text', text: '65 refreshes ≈ 1 rebuild' })).toBeDefined()
   // Until a ping is proven to buy a full hour, the plan is one trial ping, then the cap beside it.
   expect(await term.find({ type: 'Text', text: '1 trial, up to 12 if it works' })).toBeDefined()
 
@@ -796,8 +830,8 @@ test('the panel draws the dial, sets a lapse against a ping, and its buttons dri
   expect(drawings[2]!.props.height).toBe(94)
   expect(comparison).toContain('>$3.60</text>')
   // The terminal's ping measured what a ping really adds, so the figures now use that.
-  expect(comparison).toContain('>$0.055</text>')
-  expect(comparison).toContain('>64 refreshes ≈ 1 rebuild</text>')
+  expect(comparison).toContain('>$0.061</text>')
+  expect(comparison).toContain('>57 refreshes ≈ 1 rebuild</text>')
   expect(comparison).toContain('<text x="0" y="35"')
   expect(comparison).toContain('<text x="0" y="63"')
   expect(comparison).toContain('<text x="0" y="88"')

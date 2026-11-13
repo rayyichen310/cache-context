@@ -55,8 +55,12 @@ export function verdictOf(served: number, cachedBefore: number): Verdict {
   return served < cachedBefore * MISS ? 'miss' : 'partial'
 }
 
-export function overheadOf(held: Snapshot): { input: number; output: number } {
-  return held.lastPing ?? DEFAULT_PING_OVERHEAD
+export function overheadOf(held: Snapshot): { input: number; output: number; written: number } {
+  const own = held.lastPing ?? DEFAULT_PING_OVERHEAD
+  // Every ping so far wrote the last reply again; with that unknown, what the last ping wrote.
+  const written = held.tailTokens ?? held.lastPing?.created ?? 0
+
+  return { input: own.input, output: own.output, written }
 }
 
 export function remainingOf(held: Snapshot, now: number): number {
