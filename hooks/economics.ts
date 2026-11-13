@@ -58,8 +58,8 @@ export function economics(
   const perToken = price.input / 1e6
   const readUsd = cachedTokens * perToken * price.read
   const rewriteUsd = cachedTokens * perToken * WRITE_MULTIPLIER[ttl]
-  // The written tokens are priced at this cache's write rate, as a ping's own report prices them.
-  const writtenUsd = (overhead.written ?? 0) * perToken * WRITE_MULTIPLIER[ttl]
+  // A ping caches the last reply it writes for five minutes, whatever this cache's lifetime.
+  const writtenUsd = (overhead.written ?? 0) * perToken * WRITE_MULTIPLIER['5m']
   const pingUsd = readUsd + writtenUsd + overhead.input * perToken + (overhead.output * price.output) / 1e6
   const lapseUsd = rewriteUsd - readUsd
   const ratio = pingUsd > 0 ? lapseUsd / pingUsd : 0

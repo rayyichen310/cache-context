@@ -313,7 +313,8 @@ function forkHit() {
 }
 
 // Figures from a real session: the last turn read 90,970 and wrote 1,291 with a 5,257-token reply,
-// and every refresh after it read 92,261 and wrote those 5,257 again.
+// and every refresh after it read 92,261 and wrote those 5,257 again, as a five-minute entry: a refresh
+// 25 seconds later read 97,518 and wrote nothing, one 6.9 minutes after that wrote the 5,257 again.
 test('a refresh is priced with the last reply it writes to the cache again', { timeoutMs: 30_000 }, async ($, on) => {
   mock.clock(on, { now: START })
   mock.store(on)
@@ -339,10 +340,10 @@ test('a refresh is priced with the last reply it writes to the cache again', { t
   await step.result
 
   const ping = await $.command.run({ command: 'cache-ping', args: '' })
-  expect(ping.text).toContain('$0.061')
+  expect(ping.text).toContain('$0.045')
   const status = await $.command.run({ command: 'cache-status', args: '' })
-  // 92,261 read at 0.05 + 5,257 written at 2 + 40 in + 4 out, at $4 / $20 per million: the cost the refresh itself reported.
-  expect(status.text).toContain('  One refresh: about $0.061 (token overhead measured). Up to 11 in a row cost less than one rebuild')
+  // 92,261 read at 0.05 + 5,257 written at the five-minute 1.25 + 40 in + 4 out, at $4 / $20 per million.
+  expect(status.text).toContain('  One refresh: about $0.045 (token overhead measured). Up to 16 in a row cost less than one rebuild')
 })
 
 test('the band and card distinguish a model switch from the lifetime running out', { timeoutMs: 30_000 }, async ($, on) => {
@@ -787,9 +788,9 @@ test('the panel draws the dial, sets a lapse against a ping, and its buttons dri
   expect((await term.find({ type: 'Text', text: '52m' }))?.props.bold).toBe(true)
   expect(await term.find({ type: 'Text', text: 'left · 180k tokens cached' })).toBeDefined()
   expect(await term.find({ type: 'Text', text: '$3.60' })).toBeDefined()
-  // A ping also writes the 300-token last reply again, at the one-hour write rate.
-  expect(await term.find({ type: 'Text', text: '$0.054' })).toBeDefined()
-  expect(await term.find({ type: 'Text', text: '65 refreshes ≈ 1 rebuild' })).toBeDefined()
+  // A ping also writes the 300-token last reply again, as a five-minute entry.
+  expect(await term.find({ type: 'Text', text: '$0.052' })).toBeDefined()
+  expect(await term.find({ type: 'Text', text: '68 refreshes ≈ 1 rebuild' })).toBeDefined()
   // Until a ping is proven to buy a full hour, the plan is one trial ping, then the cap beside it.
   expect(await term.find({ type: 'Text', text: '1 trial, up to 12 if it works' })).toBeDefined()
 
@@ -830,8 +831,8 @@ test('the panel draws the dial, sets a lapse against a ping, and its buttons dri
   expect(drawings[2]!.props.height).toBe(94)
   expect(comparison).toContain('>$3.60</text>')
   // The terminal's ping measured what a ping really adds, so the figures now use that.
-  expect(comparison).toContain('>$0.061</text>')
-  expect(comparison).toContain('>57 refreshes ≈ 1 rebuild</text>')
+  expect(comparison).toContain('>$0.059</text>')
+  expect(comparison).toContain('>60 refreshes ≈ 1 rebuild</text>')
   expect(comparison).toContain('<text x="0" y="35"')
   expect(comparison).toContain('<text x="0" y="63"')
   expect(comparison).toContain('<text x="0" y="88"')

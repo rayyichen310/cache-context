@@ -12,9 +12,9 @@ Only the main conversation is tracked; subagents keep caches of their own. After
 
 ## When a refresh pays off
 
-A refresh replays the conversation's last request with Claude's last reply after it. It reads the cached prefix at the cache-read price `r`, writes that last reply into the cache at the cache-write price `w`, and adds a few dozen tokens for the request itself. Every refresh recorded so far has written the reply again, even one sent 55 minutes after the refresh before it, so the mod counts the reply in every refresh: the reply's length is the output tokens of Claude's last reply.
+A refresh replays the conversation's last request with Claude's last reply after it. It reads the cached prefix at the cache-read price `r`, writes that last reply into the cache, and adds a few dozen tokens for the request itself. The reply's length is the output tokens of Claude's last reply. A refresh caches the reply for five minutes, even when the conversation itself uses the one-hour cache: a second refresh within five minutes reads the reply from the cache, but one sent later, as every auto-refresh is, writes it again. So the mod counts the reply in every refresh, at the five-minute write price (1.25 times the normal input price).
 
-After an expiry the prefix is written again at `w`, which is `w − r` per token more than a hit would have cost. Call one refresh's cost `p` and that difference over the whole prefix `L`. Refreshes are worth sending while their total stays under `L`, which gives at most about `L / p` refreshes in a row. A refresh pays off whenever the chance you come back within its window is above about `p / L`. `/cache-status` shows both numbers for your model, cache size and last reply.
+After an expiry the prefix is written again at the cache-write price `w`, which is `w − r` per token more than a hit would have cost. Call one refresh's cost `p` and that difference over the whole prefix `L`. Refreshes are worth sending while their total stays under `L`, which gives at most about `L / p` refreshes in a row. A refresh pays off whenever the chance you come back within its window is above about `p / L`. `/cache-status` shows both numbers for your model, cache size and last reply.
 
 Dollar figures are computed at API list prices. On a subscription they are an equivalent, not a charge.
 

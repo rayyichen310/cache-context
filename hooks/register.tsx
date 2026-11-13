@@ -880,7 +880,8 @@ async function ping($: EngineInterface, isForced: boolean): Promise<PingResult> 
       ? m.atListPrice(
           fmtUsd(
             (lastPing.read * price.read * price.input +
-              lastPing.created * WRITE_MULTIPLIER[held.ttl] * price.input +
+              // On a hit what is written is the last reply, which a ping caches for five minutes.
+              lastPing.created * WRITE_MULTIPLIER[verdict === 'hit' ? '5m' : held.ttl] * price.input +
               lastPing.input * price.input +
               lastPing.output * price.output) /
               1e6,
