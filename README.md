@@ -1,20 +1,16 @@
 # cache-context
 
-A Claude Code mod that shows when your conversation's prompt cache expires and what rebuilding it would cost, how full the context window is, and can pause a session near the five-hour usage limit and continue it after the reset.
+A Claude Code mod that shows when your conversation's prompt cache expires and what rebuilding it would cost, how full the context window is, and can pause a session near the five-hour usage limit and continue it after the reset. It can also keep the cache alive while you are away: that is off by default, and each refresh uses a little of your plan usage or API credit.
 
 ![The status bar above the prompt: the cache countdown, the context fill, compact, and the Refresh and Guard toggles](docs/band.png)
 
 [中文說明](README.zh-TW.md)
 
-## Features
+Everything shows on a one-line status bar above the prompt. Press "Details ›" on it, or run `/cache-panel`, for the panel shown in the sections below. On the desktop app the rings and the panel are drawn and animated; in the terminal the same information is drawn in text.
 
-Everything shows on a one-line status bar above the prompt. Press "Details ›" on it, or run `/cache-panel`, for the panel shown below. On the desktop app the rings and the panel are drawn and animated; in the terminal the same information is drawn in text.
+## See what stepping away costs — Cache countdown
 
-### Cache countdown
-
-![The cache countdown with the cost of an expiry next to the cost of one refresh](docs/panel-cache.png)
-
-Claude Code keeps your conversation in a prompt cache for five minutes or one hour after its last use. Each message sends the conversation so far to the model, and what that costs depends on the cache. Taking the model's normal input price as 1:
+Claude Code keeps your conversation in a prompt cache for five minutes or one hour after its last use. Step away longer than that, and your first message back pays to put the whole conversation into the cache again. Each message sends the conversation so far to the model, and what that costs depends on the cache. Taking the model's normal input price as 1:
 
 | How the message handles the conversation so far | Price |
 | :- | :- |
@@ -22,47 +18,53 @@ Claude Code keeps your conversation in a prompt cache for five minutes or one ho
 | For comparison: sent as normal input | 1 |
 | The cache expired: write it into the cache again | 1.25 for the five-minute cache, 2 for the one-hour cache |
 
+The ring on the status bar drains with the time the cache has left. The panel puts the cost of rebuilding the cache next to the cost of keeping it alive with one refresh:
+
+![The cache countdown with the cost of an expiry next to the cost of one refresh](docs/panel-cache.png)
+
 In the screenshot the conversation is about 220k tokens on Opus 5.5 (normal input $4 per million tokens) with the one-hour cache. Rebuilding it after an expiry costs 220k × $4 × 2 ≈ $1.76. One refresh only reads the cache, 220k × $4 × 0.05 ≈ $0.044, plus a few dozen tokens for the request itself: $0.045.
 
-The ring drains with the time left, and the panel puts the cost of letting the cache expire next to the cost of keeping it alive with one refresh. Run `/cache-status` for the same figures in text.
+After a long turn, run `/cache-status` to get the same figures in text: how long the cache has left, how many tokens it holds, and both costs. Dollar figures use API list prices; on a subscription they are an equivalent, not a charge.
 
-Dollar figures use API list prices; on a subscription they are an equivalent, not a charge.
+## Keep the cache over lunch — Auto-refresh
 
-### Auto-refresh
+When you know you will be away, auto-refresh sends one small request shortly before the cache would expire, which keeps it alive. It is off by default. **Each refresh uses a little of your plan usage or API credit.**
 
 ![The auto-refresh switch, its limit, the Refresh now button and the recent cache hits](docs/panel-auto-refresh.png)
 
-Off by default. When it is on, the mod sends one small request shortly before the cache would expire, which keeps it alive. **Each refresh uses a little of your plan usage or API credit.**
-
-- It stops at the limit you set (12 per idle period unless you change it), and before the refreshes would cost more than one rebuild.
-- Until a refresh has been seen to keep the cache alive, it sends only one per idle period.
+- Turn it on with Refresh on the status bar, "Turn on" in the panel, or `/cache-auto on 12`.
+- It stops at the limit you set (12 per idle period unless you change it), and before the refreshes would cost more than one rebuild. The panel estimates how long the cache can be kept.
+- Until a refresh has been seen to keep the cache alive, it sends only one per idle period, and the panel shows the count as `0/1`. Your next message resets the count.
 - It stays on across restarts until you turn it off.
 - While it is on, the mod turns off Claude Code's idle compaction, which would otherwise compact a long conversation before the first refresh. It turns the setting back on afterwards.
 
-### Context window
+To extend the cache once, for example before a meeting, press "Refresh now" or run `/cache-ping`. The reply says how many tokens were read from the cache and what the refresh cost, and the countdown starts over.
+
+## Know when to compact — Context window
+
+Once the context window fills, Claude Code compacts the conversation on its own. A second ring on the status bar shows how much of the window is in use, and the panel shows how close auto-compaction is:
 
 ![The context section: share of the window in use, tokens left before auto-compaction, and the compact button](docs/panel-context.png)
 
-A second ring on the status bar shows how much of the context window is in use. The panel shows a bar split by category, how many tokens are left before auto-compaction, and under "Legend" each category's share plus the MCP tools, memory files and custom agents in context; ↗ opens a memory file or agent in your default app. "Compact session" does what `/compact` does.
+- A bar split by category, and the tokens left before auto-compaction.
+- Under "Legend", each category's share, and the MCP tools, memory files and custom agents in context; ↗ opens a memory file or agent in your default app.
+- "Compact session", here and on the status bar, does what `/compact` does, when you choose.
 
-### Usage guard
+## Stop cleanly at the usage limit — Usage guard
+
+When the five-hour usage limit is reached in the middle of a task, Claude stops wherever it happens to be. The usage guard stops it a little earlier, at a point you can pick up from. It is off by default.
 
 ![The usage guard: five-hour usage, the wrap-up threshold and the continue switch](docs/panel-guard.png)
 
-Off by default. When the five-hour usage reaches the threshold (97% unless you change it), the guard asks Claude to finish the step in hand, write down its progress and stop. The session then pauses, and 30 seconds after the five-hour reset the mod sends a continue prompt. Your own message ends the pause at any time.
+- Turn it on with Guard on the status bar, "Turn on" in the panel, or `/cache-guard on`.
+- When the five-hour usage reaches the threshold (97% unless you change it), the guard asks Claude to finish the step in hand, write down its progress and stop.
+- The session then pauses, and 30 seconds after the five-hour reset the mod sends a continue prompt. Your own message ends the pause at any time.
 
-### Status bar toggles
+## Status bar toggles
 
 The Refresh and Guard toggles show their state with a dot: green on, grey off, amber at work. While the guard wraps up or pauses, its toggle says so (`Guard · wrapping up 97%`, `Guard · continues 18:30`, `Guard · paused`), and a press opens the panel instead of turning the guard off.
 
 The rules behind each feature, such as how the cache lifetime is detected, when refreshes stop, and what the guard does step by step, are in [How it works](docs/how-it-works.md).
-
-## Examples
-
-- **See what stepping away costs.** After a long turn, run `/cache-status`. It prints how long the cache has left, how many tokens it holds, and what rebuilding them would cost next to the cost of one refresh.
-- **Keep the cache active over lunch.** Run `/cache-auto on 12`, press Refresh on the status bar, or press "Turn on" in the panel. The panel shows the count as `0/1` until a refresh has been seen to work and then up to your limit, and estimates how long the cache can be kept. Your next message resets the count.
-- **Extend the cache before a meeting.** Run `/cache-ping`, or press "Refresh now" in the panel. The reply says how many tokens were read from the cache and what the refresh cost, and the countdown starts over.
-- **Let a long task stop cleanly at the usage limit.** Run `/cache-guard on`, or press Guard on the status bar or "Turn on" in the panel's usage guard section. At 97% of the five-hour usage Claude wraps up, the session pauses, and it continues after the reset.
 
 ## Install
 
