@@ -1073,8 +1073,8 @@ export const register: Register = on => {
   })
 
   on('classic.SessionStart', async ($, e, next) => {
-    if (e.source === 'compact') {
-      // The compacted conversation shares no prefix with what was cached.
+    if (e.source === 'compact' || ((e.source === 'resume' || e.source === 'fork') && e.prompt_cache_likely_expired === true)) {
+      // The compacted conversation shares no prefix with what was cached; a resume Claude Code calls expired re-caches.
       await update($, snap, () => null)
     } else if (
       (e.source === 'resume' || e.source === 'fork') &&

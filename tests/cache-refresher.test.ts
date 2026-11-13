@@ -159,14 +159,45 @@ test('a resume between the two lifetimes takes the lifetime from Claude Code\'s 
   expect(warm.text).toContain('active, 50m left')
   expect(warm.text).toContain('1h (assumed)')
 
-  await resume(true)
-  const cold = await $.command.run({ command: 'cache-status', args: '' })
-  expect(cold.text).toContain('not active (expired 5.0m ago)')
-  expect(cold.text).toContain('5m (assumed)')
-
   expect(resumedTtl(2 * MINUTE, false)).toBeUndefined()
   expect(resumedTtl(90 * MINUTE, true)).toBeUndefined()
   expect(resumedTtl(10 * MINUTE, undefined)).toBeUndefined()
+  // Claude Code calls a transcript with no reply since its last compaction expired whatever the gap.
+  expect(resumedTtl(10 * MINUTE, true)).toBeUndefined()
+})
+
+test('a resume Claude Code calls expired holds nothing to refresh and does not set the lifetime', async ($, on) => {
+  const clock = mock.clock(on, { now: START })
+  mock.store(on)
+  mock.env(on, {})
+  // Before the first response after a restart there is no reading of the plan yet.
+  let rateLimits: { kind: string; percentUsed: number }[] = []
+  on('session.usage', () => ({ value: { startedAt: START, context: { window: 1_000_000 }, rateLimits } }))
+  on('classic.SessionStart', (_, e) => e)
+  on('turn.step', async function* (_, e) {
+    return { turnId: e.turnId, index: e.index, answer: 'hi', toolUses: [], stopReason: 'end_turn', usage: usage(0, 80_000) }
+  })
+
+  // Resumed eleven minutes after a /compact, before any reply to the compacted conversation.
+  await $.classic.SessionStart({
+    source: 'resume',
+    model: 'claude-opus-5-5',
+    seconds_since_last_response: 660,
+    context_tokens: 80_000,
+    prompt_cache_likely_expired: true,
+  })
+  const resumed = await $.command.run({ command: 'cache-status', args: '' })
+  expect(resumed.text).toContain('nothing cached yet')
+
+  rateLimits = [{ kind: 'five_hour', percentUsed: 32 }]
+  await clock.advance(2 * MINUTE)
+  const step = $.turn.step({ turnId: 't1', index: 0, model: 'claude-opus-5-5', messageCount: 1 })
+  for await (const _ of step) void _
+  await step.result
+
+  const status = await $.command.run({ command: 'cache-status', args: '' })
+  expect(status.text).toContain('active, 60m left')
+  expect(status.text).toContain('1h (assumed)')
 })
 
 test('a ping is refused once the cache is cold and restarts the countdown while warm', async ($, on) => {
