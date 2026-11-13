@@ -14,7 +14,9 @@ Everything shows on a one-line status bar above the prompt. Press "Details ›" 
 
 ![The cache countdown with the cost of an expiry next to the cost of one refresh](docs/panel-cache.png)
 
-Claude Code keeps your conversation in a prompt cache for five minutes or one hour after its last use. Come back later and your next message rebuilds the cache, at 1.25 to 2 times the normal input price. The ring drains with the time left, and the panel puts the cost of letting the cache expire next to the cost of keeping it alive with one refresh. Run `/cache-status` for the same figures in text.
+Claude Code keeps your conversation in a prompt cache for five minutes or one hour after its last use. While the cache holds, each message reads the conversation from it at about a tenth of the normal input price. Once it expires, your next message writes the whole conversation into the cache again, at 1.25 times the normal input price for the five-minute cache and 2 times for the one-hour cache. In the screenshot, rebuilding the cache after it expires would cost $1.76, while one refresh that keeps it alive costs $0.045.
+
+The ring drains with the time left, and the panel puts the cost of letting the cache expire next to the cost of keeping it alive with one refresh. Run `/cache-status` for the same figures in text.
 
 Dollar figures use API list prices; on a subscription they are an equivalent, not a charge.
 
@@ -124,11 +126,11 @@ Each language is one file under `hooks/locales/` plus an entry in the registry i
 
 ## Credits
 
-cache-context is a fork of [olddonkey/cache-refresher](https://github.com/olddonkey/cache-refresher) 0.2.4, which provides the cache countdown, the cost figures, auto-refresh and the languages. The fork started when, with Claude Code 2.1.295 in the desktop app, the usage popover in local sessions stopped showing the context window. It adds:
+cache-context is a fork of [olddonkey/cache-refresher](https://github.com/olddonkey/cache-refresher) 0.2.4, which provides the cache countdown, the cost figures, auto-refresh and the languages. The fork adds:
 
+- The usage guard and `/cache-guard`
 - The context window: the ring on the status bar and the context section in the panel
 - The compact button
-- The usage guard and `/cache-guard`
 - The Refresh and Guard toggles on the status bar
 - The auto-refresh switch kept across restarts, and each session's cache countdown and open panel carried over a restart
 - Waiting for the reset when a refresh is refused at the usage limit, instead of trying again every second

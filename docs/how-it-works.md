@@ -4,7 +4,7 @@
 
 ## Prompt cache and its lifetime
 
-Claude Code reuses the cached part of your conversation at a fraction of the input price. The cache entry lives for five minutes or one hour after it was last used. Come back after that and your next message writes the conversation to the cache again, at 1.25 to 2 times the normal input price.
+Claude Code reuses the cached part of your conversation at the cache-read price, a tenth of the normal input price for most models. The cache entry lives for five minutes or one hour after it was last used. Come back after that and your next message writes the conversation to the cache again at the cache-write price: 1.25 times the normal input price for the five-minute cache, 2 times for the one-hour cache.
 
 Which lifetime applies is read from the environment variables Claude Code itself honors (`FORCE_PROMPT_CACHING_5M`, `CLAUDE_CODE_PROMPT_CACHE_TTL`, `ENABLE_PROMPT_CACHING_1H`). With none of them set, the mod assumes one hour on a subscription inside its plan limits and five minutes elsewhere. When Claude Code itself gives the lifetime (at a model switch, and on a resume between five minutes and an hour after the last response that it still counts as cached, which means one hour), the mod uses that in place of its own assumption, except past the plan's limits. Either way it corrects the lifetime from what it observes.
 
