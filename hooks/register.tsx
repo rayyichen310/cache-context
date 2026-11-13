@@ -965,6 +965,12 @@ export const register: Register = on => {
         await update($, snap, s => (s === null ? s : { ...s, pingsSinceTurn: s.pingsSinceTurn + 1 }))
         autoHeldUntil = now + RETRY_MS
       }
+      if (sent.failure === undefined && sent.verdict === 'hit') {
+        // A refresh that worked replaces the last one on the status line, so a long absence leaves one line, not one per refresh.
+        $.ui.status(line)
+        $.ui.log(line, { to: 'debug' })
+        return
+      }
       $.ui.log(line)
       if (sent.verdict !== 'hit') $.ui.toast(m.autoMissToast)
     })
@@ -1065,6 +1071,8 @@ export const register: Register = on => {
 
   on('prompt.submit', async ($, e, next) => {
     if (PERSON_KINDS.includes(e.origin.kind)) {
+      // The last automatic refresh is old news once the person is back.
+      $.ui.status(undefined)
       const { phase } = await read($, guardRun)
       if (phase === 'paused' || phase === 'resumeFailed') await endPause($)
     }

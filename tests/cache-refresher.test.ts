@@ -269,13 +269,23 @@ test('the band draws the countdown on the terminal and the desktop', { timeoutMs
 
 const HOUR_ENV = { CLAUDE_CODE_PROMPT_CACHE_TTL: '1h' }
 
+// Lines the transcript shows; lines sent to the debug log alone are left out.
 const logged: string[] = []
 const toasted: string[] = []
+// Each value the mod's status line took, in order; undefined clears it.
+const statuses: (string | undefined)[] = []
 
 // Starts the session as the engine does, so the mod's timer and commands exist.
 async function boot($: any, on: any, onInvalidate?: () => void) {
   logged.length = 0
   toasted.length = 0
+  statuses.length = 0
+  on('ui.status', (_: unknown, e: { text: string | undefined }) => {
+    statuses.push(e.text)
+
+    return { value: undefined }
+  })
+  on('prompt.submit', (_: unknown, e: { text: string }) => ({ text: e.text }))
   on('session.start', (_: unknown, e: { cwd: string }) => ({ cwd: e.cwd }))
   on('command.register', (_: unknown, e: { name: string }) => ({ value: { command: e.name } }))
   on('ui.invalidate', () => {
@@ -289,8 +299,8 @@ async function boot($: any, on: any, onInvalidate?: () => void) {
 
     return { value: undefined }
   })
-  on('ui.log', (_: unknown, e: { text: string }) => {
-    logged.push(e.text)
+  on('ui.log', (_: unknown, e: { text: string; to: string }) => {
+    if (e.to !== 'debug') logged.push(e.text)
 
     return { value: undefined }
   })
@@ -512,8 +522,12 @@ test('auto sends one ping per idle stretch until a ping is proven to extend the 
   expect(forks).toBe(1)
   await clock.advance(120 * MINUTE)
   expect(forks).toBe(1)
-  expect(logged).toHaveLength(1)
-  expect(logged[0]).toContain('Auto-refresh 1/1. Cache refreshed: read 80k')
+  // A refresh that worked replaces the status line instead of adding a transcript line each time.
+  expect(logged).toHaveLength(0)
+  expect(statuses.at(-1)).toContain('Auto-refresh 1/1. Cache refreshed: read 80k')
+  // The person's next message clears it.
+  await $.prompt.submit({ text: 'back', wait: false, origin: { kind: 'composer' } })
+  expect(statuses.at(-1)).toBeUndefined()
 })
 
 // A refresh the API refused for the plan's usage.
