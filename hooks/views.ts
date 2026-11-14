@@ -890,7 +890,7 @@ export function paneView(
       Button({ key: 'cap-up', label: '+', variant: 'secondary', onPress: handlers.onCapUp }),
     ],
   })
-  const switchRows = [
+  const switchRows: RenderNode[] = [
     between([
       words(m.autoTitle, 'title'),
       Button({
