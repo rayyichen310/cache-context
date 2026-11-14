@@ -112,7 +112,7 @@ export const hi: Messages = {
   historyEmpty: 'अभी कोई इतिहास नहीं',
   btnPing: 'अभी refresh',
   listPrice: 'API की सूची दरों पर अनुमान',
-  priceNote: cap => `अनुमानित अधिकतम ${cap} · API की सूची दरें`,
+  priceNote: (n, cap) => `${n} refresh ≤ ${cap} · API की सूची दरें`,
 
   langNow: (name, source) =>
     `भाषा: ${name} (${{ pinned: 'मैनुअल', conversation: 'बातचीत के अनुसार', locale: 'सिस्टम के अनुसार', default: 'डिफ़ॉल्ट' }[source]})।`,

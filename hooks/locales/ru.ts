@@ -107,7 +107,7 @@ export const ru: Messages = {
   historyEmpty: 'Истории пока нет',
   btnPing: 'Продлить',
   listPrice: 'Оценки по прейскуранту API',
-  priceNote: cap => `Оценка: до ${cap} · прейскурант API`,
+  priceNote: (n, cap) => `${n} ${plural(n, 'продление', 'продления', 'продлений')} ≤ ${cap} · прейскурант API`,
   langNow: (name, source) => `Язык: ${name} (${{ pinned: 'вручную', conversation: 'по разговору', locale: 'по системе', default: 'по умолчанию' }[source]}).`,
   langUsage: codes => `Использование: /cache-lang [auto|код]. Коды: ${codes}`,
 }

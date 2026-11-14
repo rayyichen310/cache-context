@@ -111,7 +111,7 @@ export const kn: Messages = {
   historyEmpty: 'ಇನ್ನೂ ಇತಿಹಾಸವಿಲ್ಲ',
   btnPing: 'Refresh',
   listPrice: 'API ಪಟ್ಟಿ ದರದ ಅಂದಾಜುಗಳು',
-  priceNote: cap => `ಅಂದಾಜು ಗರಿಷ್ಠ ${cap} · API ಪಟ್ಟಿ ದರ`,
+  priceNote: (n, cap) => `${n} refresh ≤ ${cap} · API ಪಟ್ಟಿ ದರ`,
 
   langNow: (name, source) =>
     `ಭಾಷೆ: ${name} (${{ pinned: 'ನಿಮ್ಮ ಆಯ್ಕೆ', conversation: 'ಸಂಭಾಷಣೆಯಂತೆ', locale: 'ಸಿಸ್ಟಮ್‌ನಂತೆ', default: 'ಡೀಫಾಲ್ಟ್' }[source]}).`,

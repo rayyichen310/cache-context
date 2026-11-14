@@ -100,7 +100,7 @@ export const es419: Messages = {
   historyEmpty: 'Aún sin historial',
   btnPing: 'Renovar',
   listPrice: 'Estimaciones a precios de lista de API',
-  priceNote: cap => `Máx. estimado ${cap} · precios de lista de API`,
+  priceNote: (n, cap) => `${n} ${n === 1 ? 'renovación' : 'renovaciones'} ≤ ${cap} · precios de lista de API`,
   langNow: (name, source) => `Idioma: ${name} (${{ pinned: 'manual', conversation: 'según la conversación', locale: 'según el sistema', default: 'predeterminado' }[source]}).`,
   langUsage: codes => `Uso: /cache-lang [auto|código]. Códigos: ${codes}`,
 }

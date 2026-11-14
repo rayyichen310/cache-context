@@ -111,7 +111,7 @@ export const ta: Messages = {
   historyEmpty: 'பதிவுகள் இல்லை',
   btnPing: 'Refresh செய்',
   listPrice: 'API பட்டியல் விலையில் மதிப்பீடுகள்',
-  priceNote: cap => `அதிகபட்சம் ≈${cap} · API பட்டியல் விலை`,
+  priceNote: (n, cap) => `${n} refresh ≤ ${cap} · API பட்டியல் விலை`,
 
   langNow: (name, source) =>
     `மொழி: ${name} (${{ pinned: 'நீங்கள் தேர்ந்தெடுத்தது', conversation: 'உரையாடலின்படி', locale: 'கணினியின்படி', default: 'இயல்புநிலை' }[source]}).`,

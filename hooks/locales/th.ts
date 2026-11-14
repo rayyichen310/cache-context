@@ -100,7 +100,7 @@ export const th: Messages = {
   historyEmpty: 'ยังไม่มีประวัติ',
   btnPing: 'ต่ออายุทันที',
   listPrice: 'ประมาณตามราคาปกติ API',
-  priceNote: cap => `ประมาณสูงสุด ${cap} · ราคาปกติ API`,
+  priceNote: (n, cap) => `ต่ออายุ ${n} ครั้ง สูงสุด ${cap} · ราคาปกติ API`,
   langNow: (name, source) => `ภาษา: ${name} (${{ pinned: 'ตั้งเอง', conversation: 'ตามการสนทนา', locale: 'ตามระบบ', default: 'ค่าเริ่มต้น' }[source]})`,
   langUsage: codes => `วิธีใช้: /cache-lang [auto|รหัส] รหัส: ${codes}`,
 }

@@ -99,7 +99,7 @@ export const so: Messages = {
   historyEmpty: 'Weli taariikh ma jirto',
   btnPing: 'Kordhi',
   listPrice: 'Qiyaaso qiimayaasha liiska API',
-  priceNote: cap => `Qiyaas ≤${cap} · qiimayaasha liiska API`,
+  priceNote: (n, cap) => `${n} kordhin ≤ ${cap} · qiimayaasha liiska API`,
   langNow: (name, source) => `Luqad: ${name} (${{ pinned: 'la doortay', conversation: 'raacda wada hadalka', locale: 'raacda nidaamka', default: 'asal' }[source]}).`,
   langUsage: codes => `Isticmaal: /cache-lang [auto|code]. Koodhadh: ${codes}`,
 }

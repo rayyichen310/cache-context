@@ -100,7 +100,7 @@ export const de: Messages = {
   historyEmpty: 'Noch kein Verlauf',
   btnPing: 'Verlängern',
   listPrice: 'Schätzungen zu API-Listenpreisen',
-  priceNote: cap => `Geschätzt max. ${cap} · API-Listenpreise`,
+  priceNote: (n, cap) => `${n} ${n === 1 ? 'Verlängerung' : 'Verlängerungen'} ≤ ${cap} · API-Listenpreise`,
   langNow: (name, source) => `Sprache: ${name} (${{ pinned: 'manuell', conversation: 'wie die Unterhaltung', locale: 'wie das System', default: 'Standard' }[source]}).`,
   langUsage: codes => `Verwendung: /cache-lang [auto|Code]. Codes: ${codes}`,
 }

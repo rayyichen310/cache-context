@@ -99,7 +99,7 @@ export const ig: Messages = {
   historyEmpty: 'Enweghị akụkọ ugbu a',
   btnPing: 'Gbatịa oge',
   listPrice: 'Atụmatụ n’ọnụahịa API e depụtara',
-  priceNote: cap => `Atụmatụ ≤${cap} · ọnụahịa API e depụtara`,
+  priceNote: (n, cap) => `Ịgbatị oge ${n} ≤ ${cap} · ọnụahịa API e depụtara`,
   langNow: (name, source) => `Asụsụ: ${name} (${{ pinned: 'nhọrọ gị', conversation: 'dị ka mkparịta ụka', locale: 'dị ka sistemụ', default: 'ndabara' }[source]}).`,
   langUsage: codes => `Ojiji: /cache-lang [auto|code]. Koodu: ${codes}`,
 }

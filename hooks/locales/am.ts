@@ -99,7 +99,7 @@ export const am: Messages = {
   historyEmpty: 'ገና ታሪክ የለም',
   btnPing: 'አራዝም',
   listPrice: 'ግምቶች በAPI ዝርዝር ዋጋ',
-  priceNote: cap => `ግምት ≤${cap} · የAPI ዝርዝር ዋጋ`,
+  priceNote: (n, cap) => `${n} ማራዘም ≤ ${cap} · የAPI ዝርዝር ዋጋ`,
   langNow: (name, source) => `ቋንቋ፦ ${name} (${{ pinned: 'በእጅ', conversation: 'እንደ ውይይቱ', locale: 'እንደ ስርዓቱ', default: 'ነባሪ' }[source]})።`,
   langUsage: codes => `አጠቃቀም፦ /cache-lang [auto|code]። ኮዶች፦ ${codes}`,
 }

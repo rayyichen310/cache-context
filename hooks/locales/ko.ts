@@ -100,7 +100,7 @@ export const ko: Messages = {
   historyEmpty: '아직 기록 없음',
   btnPing: '지금 갱신',
   listPrice: 'API 정가 기준 추정치',
-  priceNote: cap => `예상 최대 ${cap} · API 정가`,
+  priceNote: (n, cap) => `갱신 ${n}회 최대 ${cap} · API 정가`,
   langNow: (name, source) => `표시 언어: ${name} (${{ pinned: '수동 설정', conversation: '대화에 맞춤', locale: '시스템에 맞춤', default: '기본값' }[source]}).`,
   langUsage: codes => `사용법: /cache-lang [auto|언어 코드]. 코드: ${codes}`,
 }

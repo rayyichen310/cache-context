@@ -100,7 +100,7 @@ export const vi: Messages = {
   historyEmpty: 'Chưa có lịch sử',
   btnPing: 'Gia hạn ngay',
   listPrice: 'Ước tính theo giá niêm yết API',
-  priceNote: cap => `Ước tính tối đa ${cap} · giá niêm yết API`,
+  priceNote: (n, cap) => `${n} lần gia hạn ≤ ${cap} · giá niêm yết API`,
   langNow: (name, source) => `Ngôn ngữ: ${name} (${{ pinned: 'đặt thủ công', conversation: 'theo cuộc trò chuyện', locale: 'theo hệ thống', default: 'mặc định' }[source]}).`,
   langUsage: codes => `Cách dùng: /cache-lang [auto|mã]. Mã: ${codes}`,
 }

@@ -68,7 +68,7 @@ const SAMPLES: Samples = {
   autoTrialOn: [{ args: [1, 200] }],
   historyAll: [{ args: [8] }],
   historySome: [{ args: [8, 2] }, { args: [8, 1] }],
-  priceNote: [{ args: [COST] }],
+  priceNote: [{ args: [200, COST] }, { args: [1, COST] }],
   langNow: [
     { args: ['Language 2345', 'pinned'], free: ['Language 2345'] },
     { args: ['Language 2345', 'conversation'], free: ['Language 2345'] },

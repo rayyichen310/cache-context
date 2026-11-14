@@ -101,7 +101,7 @@ export const nl: Messages = {
   historyEmpty: 'Nog geen geschiedenis',
   btnPing: 'Verleng nu',
   listPrice: 'Schattingen tegen API-catalogusprijzen',
-  priceNote: cap => `Geschat max ${cap} · API-catalogusprijzen`,
+  priceNote: (n, cap) => `${n} ${renewals(n)} ≤ ${cap} · API-catalogusprijzen`,
   langNow: (name, source) => `Taal: ${name} (${{ pinned: 'handmatig', conversation: 'volgt het gesprek', locale: 'volgt je systeem', default: 'standaard' }[source]}).`,
   langUsage: codes => `Gebruik: /cache-lang [auto|code]. Codes: ${codes}`,
 }

@@ -793,6 +793,8 @@ test('the panel draws the dial, sets a lapse against a ping, and its buttons dri
   expect(await term.find({ type: 'Text', text: '68 refreshes ≈ 1 rebuild' })).toBeDefined()
   // Until a ping is proven to buy a full hour, the plan is one trial ping, then the cap beside it.
   expect(await term.find({ type: 'Text', text: '1 trial, up to 12 if it works' })).toBeDefined()
+  // The footer says how many refreshes its maximum is for.
+  expect(await term.find({ type: 'Text', text: '1 refresh: up to $0.052 · API list prices' })).toBeDefined()
 
   // Switched on, the caption turns from what is cached to what the plan will do.
   await term.press({ key: 'auto-toggle' })

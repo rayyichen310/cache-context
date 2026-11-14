@@ -99,7 +99,7 @@ export const ny: Messages = {
   historyEmpty: 'Palibe mbiri panobe',
   btnPing: 'Onjezera',
   listPrice: 'Yoyerekeza pa mitengo ya API yolembedwa',
-  priceNote: cap => `Yoyerekeza ≤${cap} · mitengo ya API yolembedwa`,
+  priceNote: (n, cap) => `Onjezera nthawi ${n} ≤ ${cap} · mitengo ya API`,
   langNow: (name, source) => `Chinenero: ${name} (${{ pinned: 'chosankhidwa', conversation: 'malinga ndi zokambirana', locale: 'malinga ndi makina', default: 'choyambirira' }[source]}).`,
   langUsage: codes => `Kugwiritsa ntchito: /cache-lang [auto|code]. Ma code: ${codes}`,
 }

@@ -111,7 +111,7 @@ export const bn: Messages = {
   historyEmpty: 'এখনও ইতিহাস নেই',
   btnPing: 'Refresh করুন',
   listPrice: 'API-এর তালিকাভুক্ত দরে অনুমান',
-  priceNote: cap => `আনুমানিক সর্বোচ্চ ${cap} · API-এর তালিকাভুক্ত দর`,
+  priceNote: (n, cap) => `${n} বার refresh ≤ ${cap} · API-এর তালিকাভুক্ত দর`,
 
   langNow: (name, source) =>
     `ভাষা: ${name} (${{ pinned: 'নিজের নির্বাচন', conversation: 'কথোপকথন অনুযায়ী', locale: 'সিস্টেম অনুযায়ী', default: 'ডিফল্ট' }[source]})।`,

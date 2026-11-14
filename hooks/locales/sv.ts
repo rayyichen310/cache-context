@@ -101,7 +101,7 @@ export const sv: Messages = {
   historyEmpty: 'Ingen historik ännu',
   btnPing: 'Förnya nu',
   listPrice: 'Uppskattningar enligt API-listpriser',
-  priceNote: cap => `Uppskattat max ${cap} · API-listpriser`,
+  priceNote: (n, cap) => `${n} ${renewals(n)} ≤ ${cap} · API-listpriser`,
   langNow: (name, source) => `Språk: ${name} (${{ pinned: 'manuellt', conversation: 'följer samtalet', locale: 'följer systemet', default: 'standard' }[source]}).`,
   langUsage: codes => `Användning: /cache-lang [auto|kod]. Koder: ${codes}`,
 }

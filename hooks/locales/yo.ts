@@ -99,7 +99,7 @@ export const yo: Messages = {
   historyEmpty: 'Kò tíì sí ìtàn',
   btnPing: 'Fikún àkókò',
   listPrice: 'Ìṣírò ní iye owó API tí a ṣe àkójọ',
-  priceNote: cap => `Ìṣírò ≤${cap} · iye owó API tí a ṣe àkójọ`,
+  priceNote: (n, cap) => `Àfikún ${n} ≤ ${cap} · iye owó API tí a ṣe àkójọ`,
   langNow: (name, source) => `Èdè: ${name} (${{ pinned: 'yíyan', conversation: 'gẹ́gẹ́ bí ìjíròrò', locale: 'gẹ́gẹ́ bí ẹ̀rọ', default: 'àkọ́kọ́' }[source]}).`,
   langUsage: codes => `Ìlò: /cache-lang [auto|code]. Àwọn kóòdù: ${codes}`,
 }

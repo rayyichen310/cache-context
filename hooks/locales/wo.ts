@@ -99,7 +99,7 @@ export const wo: Messages = {
   historyEmpty: 'Amagul jaar-jaar',
   btnPing: 'Yokk diir',
   listPrice: 'Xayma ci njëgi API yi ci lim bi',
-  priceNote: cap => `Xayma ≤${cap} · njëgi API yi ci lim bi`,
+  priceNote: (n, cap) => `${n} yokk diir ≤ ${cap} · njëgi API yi ci lim bi`,
   langNow: (name, source) => `Làkk: ${name} (${{ pinned: 'tànn nañu ko', conversation: 'topp waxtaan wi', locale: 'topp sistem bi', default: 'bu jëkk' }[source]}).`,
   langUsage: codes => `Jëfandikoo: /cache-lang [auto|code]. Kóod yi: ${codes}`,
 }

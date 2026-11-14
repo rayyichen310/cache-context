@@ -119,7 +119,7 @@ export const zh: Messages = {
   historyEmpty: '暂无记录',
   btnPing: '立即续期',
   listPrice: '金额按 API 标价估算',
-  priceNote: cap => `预计最多 ${cap} · 按 API 标价估算`,
+  priceNote: (n, cap) => `续期 ${n} 次最多 ${cap} · 按 API 标价估算`,
 
   langNow: (name, source) =>
     `显示语言：${name}（${{ pinned: '手动设置', conversation: '跟随对话', locale: '跟随系统', default: '默认' }[source]}）。`,

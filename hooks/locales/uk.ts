@@ -107,7 +107,7 @@ export const uk: Messages = {
   historyEmpty: 'Історії ще немає',
   btnPing: 'Подовжити',
   listPrice: 'Оцінки за прейскурантом API',
-  priceNote: cap => `Оцінка: до ${cap} · прейскурант API`,
+  priceNote: (n, cap) => `${n} ${plural(n, 'подовження', 'подовження', 'подовжень')} ≤ ${cap} · прейскурант API`,
   langNow: (name, source) => `Мова: ${name} (${{ pinned: 'вручну', conversation: 'за розмовою', locale: 'за системою', default: 'типова' }[source]}).`,
   langUsage: codes => `Використання: /cache-lang [auto|код]. Коди: ${codes}`,
 }

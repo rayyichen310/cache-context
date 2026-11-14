@@ -111,7 +111,7 @@ export const ml: Messages = {
   historyEmpty: 'ചരിത്രമില്ല',
   btnPing: 'Refresh',
   listPrice: 'API പട്ടിക നിരക്കിലെ കണക്കുകൾ',
-  priceNote: cap => `പരമാവധി ≈${cap} · API പട്ടിക നിരക്ക്`,
+  priceNote: (n, cap) => `${n} refresh ≤ ${cap} · API പട്ടിക നിരക്ക്`,
 
   langNow: (name, source) =>
     `ഭാഷ: ${name} (${{ pinned: 'നിങ്ങളുടെ തിരഞ്ഞെടുപ്പ്', conversation: 'സംഭാഷണം അനുസരിച്ച്', locale: 'സിസ്റ്റം അനുസരിച്ച്', default: 'ഡിഫോൾട്ട്' }[source]}).`,

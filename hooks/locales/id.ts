@@ -100,7 +100,7 @@ export const id: Messages = {
   historyEmpty: 'Belum ada riwayat',
   btnPing: 'Perpanjang',
   listPrice: 'Perkiraan dengan harga katalog API',
-  priceNote: cap => `Perkiraan maks ${cap} · harga katalog API`,
+  priceNote: (n, cap) => `${n} perpanjangan ≤ ${cap} · harga katalog API`,
   langNow: (name, source) => `Bahasa: ${name} (${{ pinned: 'manual', conversation: 'mengikuti percakapan', locale: 'mengikuti sistem', default: 'bawaan' }[source]}).`,
   langUsage: codes => `Penggunaan: /cache-lang [auto|kode]. Kode: ${codes}`,
 }

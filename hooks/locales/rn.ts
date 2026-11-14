@@ -99,7 +99,7 @@ export const rn: Messages = {
   historyEmpty: 'Nta kahise karabaho',
   btnPing: 'Yongera igihe',
   listPrice: 'Ibigereranyo ku biciro vya API biri ku rutonde',
-  priceNote: cap => `Ikigereranyo ≤${cap} · ibiciro vya API ku rutonde`,
+  priceNote: (n, cap) => `Kwongerereza ${n} ≤ ${cap} · ibiciro vya API`,
   langNow: (name, source) => `Ururimi: ${name} (${{ pinned: 'rwatowe', conversation: 'rukurikira ikiganiro', locale: 'rukurikira sisitemu', default: 'rwa mbere' }[source]}).`,
   langUsage: codes => `Uko bikoreshwa: /cache-lang [auto|code]. Amakode: ${codes}`,
 }

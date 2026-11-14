@@ -99,7 +99,7 @@ export const om: Messages = {
   historyEmpty: 'Ammallee seenaa hin jiru',
   btnPing: 'Dheeressi',
   listPrice: 'Tilmaama gatii API tarreeffameen',
-  priceNote: cap => `Tilmaama ≤${cap} · gatii API tarreeffameen`,
+  priceNote: (n, cap) => `Dheeressuu ${n} ≤ ${cap} · gatii API tarreeffameen`,
   langNow: (name, source) => `Afaan: ${name} (${{ pinned: 'filannoo kee', conversation: 'akka mariitti', locale: 'akka sirnaatti', default: 'durtii' }[source]}).`,
   langUsage: codes => `Fayyadama: /cache-lang [auto|code]. Koodii: ${codes}`,
 }

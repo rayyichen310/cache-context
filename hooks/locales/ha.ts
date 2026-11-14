@@ -99,7 +99,7 @@ export const ha: Messages = {
   historyEmpty: 'Babu tarihi tukuna',
   btnPing: 'Tsawaita',
   listPrice: 'Ƙiyasi a farashin API da aka jera',
-  priceNote: cap => `Ƙiyasi ≤${cap} · farashin API da aka jera`,
+  priceNote: (n, cap) => `Tsawaita ${n} ≤ ${cap} · farashin API da aka jera`,
   langNow: (name, source) => `Harshe: ${name} (${{ pinned: 'da hannu', conversation: 'bisa tattaunawa', locale: 'bisa tsarin kwamfuta', default: 'na asali' }[source]}).`,
   langUsage: codes => `Amfani: /cache-lang [auto|code]. Lambobi: ${codes}`,
 }

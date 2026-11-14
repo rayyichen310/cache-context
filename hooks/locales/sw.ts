@@ -99,7 +99,7 @@ export const sw: Messages = {
   historyEmpty: 'Bado hakuna historia',
   btnPing: 'Ongeza muda',
   listPrice: 'Makadirio kwa bei za API zilizoorodheshwa',
-  priceNote: cap => `Makadirio ≤${cap} · bei za API zilizoorodheshwa`,
+  priceNote: (n, cap) => `Ongeza muda mara ${n} ≤ ${cap} · bei za API`,
   langNow: (name, source) => `Lugha: ${name} (${{ pinned: 'imewekwa', conversation: 'inafuata mazungumzo', locale: 'inafuata mfumo', default: 'chaguo-msingi' }[source]}).`,
   langUsage: codes => `Matumizi: /cache-lang [auto|code]. Misimbo: ${codes}`,
 }

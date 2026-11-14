@@ -100,7 +100,7 @@ export const it: Messages = {
   historyEmpty: 'Ancora nessuna cronologia',
   btnPing: 'Rinnova ora',
   listPrice: 'Stime ai prezzi di listino API',
-  priceNote: cap => `Max stimato ${cap} · prezzi di listino API`,
+  priceNote: (n, cap) => `${n} ${n === 1 ? 'rinnovo' : 'rinnovi'} ≤ ${cap} · prezzi di listino API`,
   langNow: (name, source) => `Lingua: ${name} (${{ pinned: 'manuale', conversation: 'segue la conversazione', locale: 'segue il sistema', default: 'predefinita' }[source]}).`,
   langUsage: codes => `Uso: /cache-lang [auto|codice]. Codici: ${codes}`,
 }

@@ -111,7 +111,7 @@ export const bho: Messages = {
   historyEmpty: 'अभी ले इतिहास नइखे',
   btnPing: 'अबहीं refresh',
   listPrice: 'API के सूची दर पर अनुमान',
-  priceNote: cap => `अनुमानित अधिकतम ${cap} · API के सूची दर`,
+  priceNote: (n, cap) => `${n} refresh ≤ ${cap} · API के सूची दर`,
 
   langNow: (name, source) =>
     `भाषा: ${name} (${{ pinned: 'रउआ चुनल', conversation: 'बातचीत के हिसाब से', locale: 'सिस्टम के हिसाब से', default: 'डिफॉल्ट' }[source]})।`,

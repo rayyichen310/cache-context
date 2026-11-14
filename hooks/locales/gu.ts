@@ -111,7 +111,7 @@ export const gu: Messages = {
   historyEmpty: 'હજી ઇતિહાસ નથી',
   btnPing: 'Refresh કરો',
   listPrice: 'API ના સૂચિ દરે અંદાજ',
-  priceNote: cap => `અંદાજે મહત્તમ ${cap} · API ના સૂચિ દરે`,
+  priceNote: (n, cap) => `${n} refresh ≤ ${cap} · API ના સૂચિ દરે`,
 
   langNow: (name, source) =>
     `ભાષા: ${name} (${{ pinned: 'પોતાની પસંદગી', conversation: 'વાતચીત મુજબ', locale: 'સિસ્ટમ મુજબ', default: 'ડિફૉલ્ટ' }[source]}).`,

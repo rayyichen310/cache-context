@@ -100,7 +100,7 @@ export const fil: Messages = {
   historyEmpty: 'Wala pang history',
   btnPing: 'Palawigin',
   listPrice: 'Tantiya sa nakalistang presyo ng API',
-  priceNote: cap => `Tantiyang max ${cap} · nakalistang presyo ng API`,
+  priceNote: (n, cap) => `${n} pagpapalawig ≤ ${cap} · nakalistang presyo ng API`,
   langNow: (name, source) => `Wika: ${name} (${{ pinned: 'manwal', conversation: 'ayon sa usapan', locale: 'ayon sa system', default: 'default' }[source]}).`,
   langUsage: codes => `Paggamit: /cache-lang [auto|code]. Mga code: ${codes}`,
 }

@@ -111,7 +111,7 @@ export const te: Messages = {
   historyEmpty: 'ఇంకా చరిత్ర లేదు',
   btnPing: 'Refresh',
   listPrice: 'API జాబితా ధరలకు అంచనాలు',
-  priceNote: cap => `అంచనా గరిష్ఠం ${cap} · API జాబితా ధరలు`,
+  priceNote: (n, cap) => `${n} refresh ≤ ${cap} · API జాబితా ధరలు`,
 
   langNow: (name, source) =>
     `భాష: ${name} (${{ pinned: 'మీ ఎంపిక', conversation: 'సంభాషణ ప్రకారం', locale: 'సిస్టమ్ ప్రకారం', default: 'డిఫాల్ట్' }[source]}).`,

@@ -138,7 +138,7 @@ export const en = {
   historyEmpty: 'No history yet',
   btnPing: 'Refresh now',
   listPrice: 'Estimates at API list prices',
-  priceNote: (cap: string) => `Est. max ${cap} · API list prices`,
+  priceNote: (n: number, cap: string) => `${n} ${n === 1 ? 'refresh' : 'refreshes'}: up to ${cap} · API list prices`,
 
   langNow: (name: string, source: LangSource) =>
     `Language: ${name} (${{ pinned: 'manual', conversation: 'matches the conversation', locale: 'matches your system', default: 'default' }[source]}).`,

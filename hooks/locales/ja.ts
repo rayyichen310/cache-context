@@ -100,7 +100,7 @@ export const ja: Messages = {
   historyEmpty: '履歴はまだありません',
   btnPing: '今すぐ延長',
   listPrice: 'API 定価による推定',
-  priceNote: cap => `推定上限 ${cap} · API 定価`,
+  priceNote: (n, cap) => `延長 ${n} 回で最大 ${cap} · API 定価`,
   langNow: (name, source) => `表示言語：${name}（${{ pinned: '手動設定', conversation: '会話に合わせる', locale: 'システムに合わせる', default: '既定' }[source]}）。`,
   langUsage: codes => `使い方：/cache-lang [auto|言語コード]。コード：${codes}`,
 }

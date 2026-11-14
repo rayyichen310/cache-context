@@ -100,7 +100,7 @@ export const zhHant: Messages = {
   historyEmpty: '尚無記錄',
   btnPing: '立即續期',
   listPrice: '金額按 API 定價估算',
-  priceNote: cap => `預估最多 ${cap} · API 定價`,
+  priceNote: (n, cap) => `續期 ${n} 次最多 ${cap} · API 定價`,
   langNow: (name, source) => `顯示語言：${name}（${{ pinned: '手動設定', conversation: '跟隨對話', locale: '跟隨系統', default: '預設' }[source]}）。`,
   langUsage: codes => `用法：/cache-lang [auto|語言代碼]。可用代碼：${codes}`,
 }

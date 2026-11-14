@@ -100,7 +100,7 @@ export const ptBR: Messages = {
   historyEmpty: 'Ainda sem histórico',
   btnPing: 'Renovar',
   listPrice: 'Estimativas a preços de tabela da API',
-  priceNote: cap => `Máx. estimado ${cap} · preços de tabela API`,
+  priceNote: (n, cap) => `${n} ${n === 1 ? 'renovação' : 'renovações'} ≤ ${cap} · preços de tabela API`,
   langNow: (name, source) => `Idioma: ${name} (${{ pinned: 'manual', conversation: 'conforme a conversa', locale: 'conforme o sistema', default: 'padrão' }[source]}).`,
   langUsage: codes => `Uso: /cache-lang [auto|código]. Códigos: ${codes}`,
 }

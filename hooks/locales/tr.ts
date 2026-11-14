@@ -100,7 +100,7 @@ export const tr: Messages = {
   historyEmpty: 'Henüz geçmiş yok',
   btnPing: 'Süreyi uzat',
   listPrice: 'API liste fiyatlarıyla tahminler',
-  priceNote: cap => `Tahmini en çok ${cap} · API liste fiyatları`,
+  priceNote: (n, cap) => `${n} uzatma ≤ ${cap} · API liste fiyatları`,
   langNow: (name, source) => `Dil: ${name} (${{ pinned: 'elle seçildi', conversation: 'konuşmaya göre', locale: 'sisteme göre', default: 'varsayılan' }[source]}).`,
   langUsage: codes => `Kullanım: /cache-lang [auto|kod]. Kodlar: ${codes}`,
 }

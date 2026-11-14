@@ -101,7 +101,7 @@ export const nb: Messages = {
   historyEmpty: 'Ingen historikk ennå',
   btnPing: 'Forny nå',
   listPrice: 'Anslag ut fra API-listepriser',
-  priceNote: cap => `Anslått maks ${cap} · API-listepriser`,
+  priceNote: (n, cap) => `${n} ${renewals(n)} ≤ ${cap} · API-listepriser`,
   langNow: (name, source) => `Språk: ${name} (${{ pinned: 'manuelt', conversation: 'følger samtalen', locale: 'følger systemet', default: 'standard' }[source]}).`,
   langUsage: codes => `Bruk: /cache-lang [auto|kode]. Koder: ${codes}`,
 }

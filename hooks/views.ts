@@ -944,7 +944,7 @@ export function paneView(
   ]
   if (lastAction) footer.push(dim(lastAction))
   if (costs) {
-    footer.push(words(left > 0 ? m.priceNote(fmtUsd(left * costs.pingUsd)) : m.listPrice, 'small', PANEL_PIXELS))
+    footer.push(words(left > 0 ? m.priceNote(left, fmtUsd(left * costs.pingUsd)) : m.listPrice, 'small', PANEL_PIXELS))
   }
 
   // The usage guard, beneath the keep-alive it works with.

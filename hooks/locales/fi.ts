@@ -101,7 +101,7 @@ export const fi: Messages = {
   historyEmpty: 'Ei vielä historiaa',
   btnPing: 'Uusi nyt',
   listPrice: 'Arviot API-listahinnoilla',
-  priceNote: cap => `Arvio enint. ${cap} · API-listahinnat`,
+  priceNote: (n, cap) => `${n} ${renewals(n)} ≤ ${cap} · API-listahinnat`,
   langNow: (name, source) => `Kieli: ${name} (${{ pinned: 'valittu käsin', conversation: 'keskustelun mukaan', locale: 'järjestelmän mukaan', default: 'oletus' }[source]}).`,
   langUsage: codes => `Käyttö: /cache-lang [auto|koodi]. Koodit: ${codes}`,
 }
