@@ -9,7 +9,7 @@ import type { LimitWords } from './limits'
 import { MESSAGES } from './messages'
 import type { Messages } from './messages'
 import { LEAD_MS, budgetOf, costsOf, isTracked, remainingOf } from './model'
-import { fmtTrimTokens, trimWords } from './trim'
+import { fmtReplyTokens, fmtTrimTokens, trimWords } from './trim'
 import type { Verdict, View } from './model'
 
 type Els = Elements['terminal'] | Elements['desktop']
@@ -31,6 +31,8 @@ export const PANEL_PIXELS = 314
 const PANEL_CELLS = 42
 // A label beside controls: what is left of the column once the stepper (88px) and the gap (16px) have theirs.
 export const LABEL_PIXELS = 200
+// A label beside one button: what is left once the button (60px) and the gap (16px) have theirs, with room to spare.
+export const BUTTON_LABEL_PIXELS = 230
 const HISTORY_PIXELS = 200
 const BAR_CELLS = 16
 const METER_CELLS = 28
@@ -901,16 +903,19 @@ export function paneView(
       }),
     ]),
     between([words(plan, 'body'), stepper]),
-    // Whether a long last reply is cached by one short message before the first refresh.
+    // Whether a long last reply is cached by one short message before the first refresh, and how long the last reply was.
     between([
-      words(trimWords(m.tag).label(fmtTrimTokens(policy.trimFrom)), 'body'),
+      words(
+        trimWords(m.tag).label(
+          fmtTrimTokens(policy.trimFrom),
+          tracked && tracked.tailTokens !== undefined ? fmtReplyTokens(tracked.tailTokens) : undefined,
+        ),
+        'body',
+        BUTTON_LABEL_PIXELS,
+      ),
       Button({ key: 'trim-toggle', label: policy.trim ? m.btnOff : m.btnOn, variant: 'secondary', onPress: handlers.onTrim }),
     ]),
   ]
-  // Beneath it, how long the last reply was, to set against the threshold.
-  if (tracked && tracked.tailTokens !== undefined) {
-    switchRows.push(words(trimWords(m.tag).last(fmtTrimTokens(tracked.tailTokens)), 'small', PANEL_PIXELS))
-  }
 
   // How the cache has held, beside the button that pings now; under it, what the last press did and the price basis.
   const recent = observations.slice(-8)

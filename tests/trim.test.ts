@@ -1,6 +1,6 @@
 import { expect, mock, test } from 'claude-code/testing'
 
-import { TRIM_PROMPT } from '../hooks/trim'
+import { TRIM_PROMPT, fmtReplyTokens } from '../hooks/trim'
 
 const SECOND = 1000
 const MINUTE = 60_000
@@ -79,6 +79,13 @@ async function turn($: any, turnId: string) {
 }
 
 const TRIM_ON = { isOn: true, cap: 3, trim: true, trimFrom: 2000 }
+
+test('a reply length beside the switch is rounded down, never up past a threshold', () => {
+  expect(fmtReplyTokens(922)).toBe('922')
+  expect(fmtReplyTokens(1_999)).toBe('1.9k')
+  expect(fmtReplyTokens(2_000)).toBe('2k')
+  expect(fmtReplyTokens(12_345)).toBe('12.3k')
+})
 
 test('a long last reply is cached by one short message, and the refreshes after it fork as usual', { timeoutMs: 30_000 }, async ($, on) => {
   const { clock, world } = await idle($, on, { auto: TRIM_ON, tail: 5_257 })

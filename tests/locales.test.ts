@@ -194,10 +194,10 @@ const ROOMS: Partial<Record<keyof Messages, [number, number]>> = {
 }
 
 test('the long-reply switch fits beside its button in each of its languages', () => {
-  // The same room as the auto-refresh title beside its own button, at the largest threshold.
+  // Beside one button, with a threshold off the thousands and a long last reply after it.
   for (const tag of ['en', 'zh-Hant']) {
-    const text = trimWords(tag).label('200k')
-    expect(estimateWidth(text, 14)).toBeLessThanOrEqual(200)
+    const text = trimWords(tag).label('2,500', '12.3k')
+    expect(estimateWidth(text, 14)).toBeLessThanOrEqual(230)
   }
 })
 
@@ -880,8 +880,8 @@ for (const lang of LANGS) {
     const paneDrawings = await pane.findAll({ type: 'Svg' })
     // The cache's ring and the two quick toggles' dots.
     expect(bandDrawings).toHaveLength(3)
-    // Splitting the card into ring, figure and costs adds two drawings; the long-reply switch and the last reply's length two; the usage guard's rule and title two more.
-    expect(paneDrawings).toHaveLength(13)
+    // Splitting the card into ring, figure and costs adds two drawings; the long-reply switch one; the usage guard's rule and title two more.
+    expect(paneDrawings).toHaveLength(12)
     for (const drawing of [...bandDrawings, ...paneDrawings]) {
       const source = String(drawing.props.source)
       const m = MESSAGES[lang]
