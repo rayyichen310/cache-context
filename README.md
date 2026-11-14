@@ -30,7 +30,7 @@ After a long turn, run `/cache-status` to get the same figures in text: how long
 
 When you know you will be away, auto-refresh sends one small request shortly before the cache would expire, which keeps it alive. It is off by default. **Each refresh uses a little of your plan usage or API credit.**
 
-![The auto-refresh switch, its limit, the Refresh now button and the recent cache hits](docs/panel-auto-refresh.png)
+![The auto-refresh switch, its limit, the long-reply switch with the last reply's length, the Refresh now button and the recent cache hits](docs/panel-auto-refresh.png)
 
 - Turn it on with Refresh on the status bar, "Turn on" in the panel, or `/cache-auto on 12`.
 - It stops at the limit you set (12 per idle period unless you change it), and before the refreshes would cost more than one rebuild. The panel estimates how long the cache can be kept.
