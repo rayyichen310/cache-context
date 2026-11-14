@@ -880,8 +880,8 @@ for (const lang of LANGS) {
     const paneDrawings = await pane.findAll({ type: 'Svg' })
     // The cache's ring and the two quick toggles' dots.
     expect(bandDrawings).toHaveLength(3)
-    // Splitting the card into ring, figure and costs adds two drawings; the long-reply switch one; the usage guard's rule and title two more.
-    expect(paneDrawings).toHaveLength(12)
+    // Splitting the card into ring, figure and costs adds two drawings; the long-reply switch and the last reply's length two; the usage guard's rule and title two more.
+    expect(paneDrawings).toHaveLength(13)
     for (const drawing of [...bandDrawings, ...paneDrawings]) {
       const source = String(drawing.props.source)
       const m = MESSAGES[lang]

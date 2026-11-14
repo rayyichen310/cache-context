@@ -9,7 +9,7 @@ import type { LimitWords } from './limits'
 import { MESSAGES } from './messages'
 import type { Messages } from './messages'
 import { LEAD_MS, budgetOf, costsOf, isTracked, remainingOf } from './model'
-import { trimWords } from './trim'
+import { fmtTrimTokens, trimWords } from './trim'
 import type { Verdict, View } from './model'
 
 type Els = Elements['terminal'] | Elements['desktop']
@@ -903,10 +903,14 @@ export function paneView(
     between([words(plan, 'body'), stepper]),
     // Whether a long last reply is cached by one short message before the first refresh.
     between([
-      words(trimWords(m.tag).label(fmtTokens(policy.trimFrom)), 'body'),
+      words(trimWords(m.tag).label(fmtTrimTokens(policy.trimFrom)), 'body'),
       Button({ key: 'trim-toggle', label: policy.trim ? m.btnOff : m.btnOn, variant: 'secondary', onPress: handlers.onTrim }),
     ]),
   ]
+  // Beneath it, how long the last reply was, to set against the threshold.
+  if (tracked && tracked.tailTokens !== undefined) {
+    switchRows.push(words(trimWords(m.tag).last(fmtTrimTokens(tracked.tailTokens)), 'small', PANEL_PIXELS))
+  }
 
   // How the cache has held, beside the button that pings now; under it, what the last press did and the price basis.
   const recent = observations.slice(-8)

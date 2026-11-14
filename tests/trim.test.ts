@@ -89,7 +89,7 @@ test('a long last reply is cached by one short message, and the refreshes after 
   // In place of the first refresh: one message, and no fork.
   expect(world.submitted).toEqual([TRIM_PROMPT])
   expect(world.forks).toBe(0)
-  expect(world.statuses.at(-1)).toContain('5k')
+  expect(world.statuses.at(-1)).toContain('5,257')
   // Waiting for its turn sends nothing more.
   await clock.advance(30 * SECOND)
   expect(world.submitted).toHaveLength(1)
@@ -150,6 +150,10 @@ test('/cache-auto trim switches it and takes a threshold', { timeoutMs: 30_000 }
 
   await $.command.run({ command: 'cache-auto', args: 'trim' })
   expect(world.kept.get('auto')).toEqual({ isOn: false, cap: 12, trim: true, trimFrom: 3000 })
+
+  // A threshold off the thousands is shown exact, never rounded up or down.
+  expect((await $.command.run({ command: 'cache-auto', args: 'trim 2500' })).text).toContain('2,500')
+  await $.command.run({ command: 'cache-auto', args: 'trim 3000' })
 
   const bad = await $.command.run({ command: 'cache-auto', args: 'trim 10' })
   expect(bad.text).toContain('Usage: /cache-auto trim')

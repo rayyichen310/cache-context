@@ -44,7 +44,7 @@ import {
 } from './model'
 import type { Extension, Observation, Verdict, View } from './model'
 import { autoLines, report } from './report'
-import { DEFAULT_TRIM_FROM, MAX_TRIM_FROM, MIN_TRIM_FROM, TRIM_DENIED, TRIM_PROMPT, trimWords } from './trim'
+import { DEFAULT_TRIM_FROM, MAX_TRIM_FROM, MIN_TRIM_FROM, TRIM_DENIED, TRIM_PROMPT, fmtTrimTokens, trimWords } from './trim'
 import { bandView, paneView } from './views'
 import type { ContextPart, Motion } from './views'
 
@@ -978,7 +978,7 @@ export const register: Register = on => {
         trimSentAt = now
         const entered = await $.prompt.submit({ text: TRIM_PROMPT }).catch(() => ({ drop: 'failed' }))
         if (entered.drop === undefined) {
-          const sentLine = trimWords(m.tag).sent(fmtTokens(tail))
+          const sentLine = trimWords(m.tag).sent(fmtTrimTokens(tail))
           $.ui.status(sentLine)
           $.ui.log(sentLine, { to: 'debug' })
           return
@@ -1194,7 +1194,7 @@ export const register: Register = on => {
       const idle = await setAuto($, now => ({ ...now, trim: wantedTrim !== 'off', trimFrom: from ?? now.trimFrom }))
       const policy = await read($, auto)
 
-      return { text: [tw.state(policy.trim, fmtTokens(policy.trimFrom)), ...(idle === null ? [] : [`  ${idle}`])].join('\n') }
+      return { text: [tw.state(policy.trim, fmtTrimTokens(policy.trimFrom)), ...(idle === null ? [] : [`  ${idle}`])].join('\n') }
     }
     const wanted = words.find(word => word === 'on' || word === 'off')
     const cap = words.map(Number).find(n => Number.isInteger(n) && n > 0 && n <= MAX_CAP)
@@ -1208,7 +1208,7 @@ export const register: Register = on => {
           }))
         : null
     const policy = await read($, auto)
-    const lines = [m.autoHeader, ...autoLines(m, await viewOf($)), tw.state(policy.trim, fmtTokens(policy.trimFrom)), m.autoNote]
+    const lines = [m.autoHeader, ...autoLines(m, await viewOf($)), tw.state(policy.trim, fmtTrimTokens(policy.trimFrom)), m.autoNote]
 
     return { text: (idle === null ? lines : [...lines, `  ${idle}`]).join('\n') }
   })

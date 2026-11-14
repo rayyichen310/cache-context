@@ -803,6 +803,7 @@ test('the panel draws the dial, sets a lapse against a ping, and its buttons dri
   expect(await term.find({ type: 'Text', text: '13' })).toBeDefined()
   // Beneath it, the long-reply switch with its threshold, off until pressed.
   expect(await term.find({ type: 'Text', text: 'Message first if reply ≥ 2k' })).toBeDefined()
+  expect(await term.find({ type: 'Text', text: 'Last reply 300 tokens' })).toBeDefined()
   expect((await term.find({ key: 'trim-toggle' }))?.text).toContain('Turn on')
   await term.press({ key: 'trim-toggle' })
   expect((await term.find({ key: 'trim-toggle' }))?.text).toContain('Turn off')
@@ -820,8 +821,8 @@ test('the panel draws the dial, sets a lapse against a ping, and its buttons dri
   // The desktop: everything that is read is drawn in one type, at the sizes measured on the app; only buttons are the app's own.
   const desk = await $.ui.mount({ plugin: 'cache-context', surface: 'desktop', component: 'Pane', requestId: 'cache', props })
   const drawings = await desk.findAll({ type: 'Svg' })
-  // Three drawings for the card instead of one, the same seven for the controls and footer, then the usage guard's rule and title.
-  expect(drawings).toHaveLength(12)
+  // Three drawings for the card instead of one, the same eight for the controls and footer, then the usage guard's rule and title.
+  expect(drawings).toHaveLength(13)
   expect(drawings[0]!.props.width).toBe(60)
   expect(drawings[0]!.props.height).toBe(60)
   expect(String(drawings[0]!.props.source)).not.toContain('<text')
@@ -849,6 +850,7 @@ test('the panel draws the dial, sets a lapse against a ping, and its buttons dri
   expect(drawn).toContain('>None left until next message</text>')
   expect(drawn).toContain('>12</text>')
   expect(drawn).toContain('>Message first if reply ≥ 2k</text>')
+  expect(drawn).toContain('>Last reply 300 tokens</text>')
   expect(drawn).toContain('>Last request hit</text>')
   expect(drawn).toContain('>Estimates at API list prices</text>')
   // Every drawing says what it is: one without an alt is not drawn.
@@ -952,7 +954,9 @@ test('the drawings move when the cache\'s state does, and a redraw carries a mov
   // What the band draws at this moment: its head's color, its ring, and what sits before the way into the panel.
   const band = async (head: string) => {
     const ui = await $.ui.mount({ plugin: 'cache-context', surface: 'desktop', component: 'AbovePrompt', props: bandProps })
-    const strip = (await ui.drawn()).children.at(-1)
+    // The row that wraps the band's parts, wherever the engine nests the hooks' trees around it.
+    const stripOf = (node: any): any => (node?.props?.flexWrap !== undefined ? node : (node?.children ?? []).map(stripOf).find(Boolean))
+    const strip = stripOf(await ui.drawn())
     const seen = {
       color: (await ui.find({ type: 'Text', text: head }))?.props.color,
       ring: String((await ui.findAll({ type: 'Svg' })).filter(one => one.props.width === 18).at(-1)!.props.source),
