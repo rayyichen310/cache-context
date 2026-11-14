@@ -154,6 +154,8 @@ let keptText: string | undefined
 let trimSentAt: number | null = null
 let trimTurnId: string | null = null
 let hasTrimmed = false
+// Whether the status line's last refresh goes once the reply to the person's message ends; a new refresh line keeps it.
+let clearsStatusAfterTurn = false
 
 /** A session's cache and panel as the store kept them for a restart. */
 type KeptSession = { snap: Snapshot | null; isPaneOpen: boolean; savedAt: number }
@@ -979,6 +981,7 @@ export const register: Register = on => {
         const entered = await $.prompt.submit({ text: TRIM_PROMPT }).catch(() => ({ drop: 'failed' }))
         if (entered.drop === undefined) {
           const sentLine = trimWords(m.tag).sent(fmtTrimTokens(tail))
+          clearsStatusAfterTurn = false
           $.ui.status(sentLine)
           $.ui.log(sentLine, { to: 'debug' })
           return
@@ -1000,6 +1003,7 @@ export const register: Register = on => {
       if (sent.failure === undefined && sent.verdict === 'hit') {
         // A refresh that worked replaces the last one on the status line, so a long absence leaves one line, not one per refresh.
         // The line holds the count alone, which fits its width; what the refresh read and cost is in /cache-status.
+        clearsStatusAfterTurn = false
         $.ui.status(
           m
             .autoLog(held.pingsSinceTurn + 1, budget, '')
@@ -1087,6 +1091,11 @@ export const register: Register = on => {
 
   on('turn.complete', async ($, e, next) => {
     const result = await next(e)
+    // The last refresh stays in sight while Claude answers the person, and goes with the answer; the long-reply turn keeps it.
+    if (clearsStatusAfterTurn && e.agentId === undefined && e.turnId !== trimTurnId) {
+      clearsStatusAfterTurn = false
+      $.ui.status(undefined)
+    }
     if (e.turnId === trimTurnId) trimTurnId = null
     if (e.agentId === undefined) await settleTurn($, e.turnId, e.reason)
 
@@ -1116,8 +1125,8 @@ export const register: Register = on => {
 
   on('prompt.submit', async ($, e, next) => {
     if (PERSON_KINDS.includes(e.origin.kind)) {
-      // The last automatic refresh is old news once the person is back, and a new idle period may send its own message.
-      $.ui.status(undefined)
+      // The last automatic refresh is old news once the reply to this message ends, and a new idle period may send its own message.
+      clearsStatusAfterTurn = true
       hasTrimmed = false
       const { phase } = await read($, guardRun)
       if (phase === 'paused' || phase === 'resumeFailed') await endPause($)

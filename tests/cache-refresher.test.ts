@@ -541,6 +541,8 @@ test('auto sends one ping per idle stretch until a ping is proven to extend the 
   on('turn.step', async function* (_, e) {
     return { turnId: e.turnId, index: e.index, answer: 'hi', toolUses: [], stopReason: 'end_turn', usage: usage(0, 80_000) }
   })
+  on('turn.start', (_: unknown, e: { turnId: string }) => ({ turnId: e.turnId }))
+  on('turn.complete', (_: unknown, e: { answer: string }) => ({ text: e.answer }))
 
   await boot($, on)
   const step = $.turn.step({ turnId: 't1', index: 0, model: 'claude-sonnet-5-5', messageCount: 1 })
@@ -560,8 +562,11 @@ test('auto sends one ping per idle stretch until a ping is proven to extend the 
   expect(logged).toHaveLength(0)
   // Only the count: the status line is one short line, and the details are in /cache-status.
   expect(statuses.at(-1)).toBe('Auto-refresh 1/1')
-  // The person's next message clears it.
+  // The person's next message keeps it while the reply runs, and the end of that reply clears it.
   await $.prompt.submit({ text: 'back', wait: false, origin: { kind: 'composer' } })
+  await $.turn.start({ text: 'back', turnId: 't2' })
+  expect(statuses.at(-1)).toBe('Auto-refresh 1/1')
+  await $.turn.complete({ answer: 'ok', durationMs: 1, isAborted: false, turnId: 't2', reason: 'answer' })
   expect(statuses.at(-1)).toBeUndefined()
 })
 
