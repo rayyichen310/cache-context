@@ -558,7 +558,8 @@ test('auto sends one ping per idle stretch until a ping is proven to extend the 
   expect(forks).toBe(1)
   // A refresh that worked replaces the status line instead of adding a transcript line each time.
   expect(logged).toHaveLength(0)
-  expect(statuses.at(-1)).toContain('Auto-refresh 1/1. Cache refreshed: read 80k')
+  // Only the count: the status line is one short line, and the details are in /cache-status.
+  expect(statuses.at(-1)).toBe('Auto-refresh 1/1')
   // The person's next message clears it.
   await $.prompt.submit({ text: 'back', wait: false, origin: { kind: 'composer' } })
   expect(statuses.at(-1)).toBeUndefined()

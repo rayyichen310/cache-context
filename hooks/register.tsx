@@ -999,7 +999,13 @@ export const register: Register = on => {
       }
       if (sent.failure === undefined && sent.verdict === 'hit') {
         // A refresh that worked replaces the last one on the status line, so a long absence leaves one line, not one per refresh.
-        $.ui.status(line)
+        // The line holds the count alone, which fits its width; what the refresh read and cost is in /cache-status.
+        $.ui.status(
+          m
+            .autoLog(held.pingsSinceTurn + 1, budget, '')
+            .trimEnd()
+            .replace(/[.。।።]$/u, ''),
+        )
         $.ui.log(line, { to: 'debug' })
         return
       }

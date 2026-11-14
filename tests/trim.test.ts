@@ -96,7 +96,7 @@ test('a long last reply is cached by one short message, and the refreshes after 
   // In place of the first refresh: one message, and no fork.
   expect(world.submitted).toEqual([TRIM_PROMPT])
   expect(world.forks).toBe(0)
-  expect(world.statuses.at(-1)).toContain('5,257')
+  expect(world.statuses.at(-1)).toBe('Short message sent to cache the reply (5,257)')
   // Waiting for its turn sends nothing more.
   await clock.advance(30 * SECOND)
   expect(world.submitted).toHaveLength(1)

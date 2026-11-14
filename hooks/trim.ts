@@ -39,7 +39,7 @@ const EN: TrimWords = {
     isOn
       ? `  Long replies: on. A last reply of ${size}+ tokens is cached by one short message before the first refresh`
       : `  Long replies: off (/cache-auto trim caches a last reply of ${size}+ tokens with one short message)`,
-  sent: size => `Auto-refresh sent a short message to cache the last reply (${size} tokens) with the conversation`,
+  sent: size => `Short message sent to cache the reply (${size})`,
   hint: 'trim [on|off] [tokens]',
   usage: (min, max) => `Usage: /cache-auto trim [on|off] [tokens, ${min}-${max}]. Tokens alone turn it on.`,
 }
@@ -50,7 +50,7 @@ const ZH_HANT: TrimWords = {
     isOn
       ? `  長回覆：開啟。最後一則回覆有 ${size} token 以上時，第一次續期前先插一則短訊息把它存進快取`
       : `  長回覆：關閉（/cache-auto trim 會在最後一則回覆有 ${size} token 以上時，先插一則短訊息把它存進快取）`,
-  sent: size => `自動續期送出一則短訊息，把最後一則回覆（${size} token）存進快取`,
+  sent: size => `已送短訊息快取最後回覆（${size}）`,
   hint: 'trim [on|off] [token 數]',
   usage: (min, max) => `用法：/cache-auto trim [on|off] [token 數，${min}-${max}]。只給 token 數會同時開啟。`,
 }
